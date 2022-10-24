@@ -1,3 +1,8 @@
+/*
+* Author: Hegusung
+* Github: https://github.com/hegusung/RedCpp
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
@@ -12,6 +17,10 @@
 #include <vector>
 #include <windows.h>
 #include <olectl.h> 
+#include <Wbemidl.h>
+#include <comdef.h>
+
+# pragma comment(lib, "wbemuuid.lib")
 
 typedef std::vector<char> vectByte;
 
@@ -21,10 +30,11 @@ typedef std::vector<char> vectByte;
 class SystemInfo
 {
 public:
-	SystemInfo(WORD wProcessorArchitecture, DWORD dwNumberOfProcessors, DWORD dwMajorVersion, DWORD dwMinorVersion, DWORD dwBuildNumber, DWORD wProductType);
-	std::string proc_arch;
-	unsigned int nb_procs;
-	std::string win_version;
+	SystemInfo(std::wstring os_name, std::wstring os_arch, std::wstring install_date, std::wstring last_boot_date);
+	std::wstring os_name;
+	std::wstring os_arch;
+	std::wstring install_date;
+	std::wstring last_boot_date;
 };
 
 class Application
@@ -49,14 +59,17 @@ class Localhost
 public:
 	Localhost();
 	~Localhost();
-	SystemInfo getSystemInfo();
+	SystemInfo* getSystemInfo();
 	std::list<Application> getApplications();
 	std::list<RDPServer> getRDPServers();
 	// registry
-	std::list<std::string> listSubkeys(const char* reg_path);
+	std::list<std::string>* listSubKeys(const char* reg_path);
 	std::string getStringRegKey(HKEY hKey, const char* valueName);
 	// Screenshot
 	vectByte screenshot();
 };
 
 void image_to_buffer_png(const CImage &image, vectByte &buf);
+
+bool initializeCom();
+bool setUpWBEM(IWbemLocator*& wbemLocator, IWbemServices*& wbemServices);

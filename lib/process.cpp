@@ -1,3 +1,8 @@
+/*
+* Author: Hegusung
+* Github: https://github.com/hegusung/RedCpp
+*/
+
 #include "process.h"
 
 //#define DEBUG

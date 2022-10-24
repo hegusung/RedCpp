@@ -1,3 +1,8 @@
+/*
+* Author: Hegusung
+* Github: https://github.com/hegusung/RedCpp
+*/
+
 #ifndef PROCESS_HEADER
 #define PROCESS_HEADER
 

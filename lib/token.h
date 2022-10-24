@@ -1,3 +1,8 @@
+/*
+* Author: Hegusung
+* Github: https://github.com/hegusung/RedCpp
+*/
+
 #ifndef TOKEN_HEADER
 #define TOKEN_HEADER
 

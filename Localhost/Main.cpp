@@ -1,5 +1,7 @@
-﻿// Localhost.cpp : This file contains the 'main' function. Program execution begins and ends there.
-//
+﻿/*
+* Author: Hegusung
+* Github: https://github.com/hegusung/RedCpp
+*/
 
 #include <iostream>
 #include "../lib/localhost.h"
@@ -9,12 +11,20 @@ void getSystemInfo()
 {
 	Localhost host = Localhost();
 
-	SystemInfo systeminfo = host.getSystemInfo();
+	SystemInfo* systeminfo = host.getSystemInfo();
 
-	printf("SystemInfo:\n");
-	printf("Processor: %s\n", systeminfo.proc_arch.c_str());
-	printf("Number of processors: %d\n", systeminfo.nb_procs);
-	printf("Operating System: %s\n", systeminfo.win_version.c_str());
+	if (systeminfo != NULL)
+	{
+		printf("SystemInfo:\n");
+		wprintf(L"OS Name: %s\n", systeminfo->os_name.c_str());
+		wprintf(L"OS Arch: %s\n", systeminfo->os_arch.c_str());
+		wprintf(L"Install date: %s\n", systeminfo->install_date.c_str());
+		wprintf(L"Last boot date: %s\n", systeminfo->last_boot_date.c_str());
+	}
+	else
+	{
+		printf("Unable to get system info\n");
+	}
 
 
 	std::list<Application> apps = host.getApplications();

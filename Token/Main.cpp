@@ -1,5 +1,7 @@
-// Token.cpp : This file contains the 'main' function. Program execution begins and ends there.
-//
+/*
+* Author: Hegusung
+* Github: https://github.com/hegusung/RedCpp
+*/
 
 #include <iostream>
 #include "../lib/token.h"

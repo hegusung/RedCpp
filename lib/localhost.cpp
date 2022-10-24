@@ -1,12 +1,17 @@
-﻿#include "localhost.h"
+﻿/*
+* Author: Hegusung
+* Github: https://github.com/hegusung/RedCpp
+*/
+
+#include "localhost.h"
 
 Localhost::Localhost() {}
 
 Localhost::~Localhost() {}
 
-std::list<std::string> Localhost::listSubkeys(const char* reg_path)
+std::list<std::string>* Localhost::listSubKeys(const char* reg_path)
 {
-	std::list<std::string> subkeys;
+	std::list<std::string>* keys;
 
 	TCHAR achKey[MAX_KEY_LENGTH] = TEXT("");
 	DWORD cbName;
@@ -26,11 +31,16 @@ std::list<std::string> Localhost::listSubkeys(const char* reg_path)
 	DWORD cchValue = MAX_VALUE_NAME;
 
 	HKEY hKey = NULL;
-	LONG lResult = RegOpenKey(HKEY_LOCAL_MACHINE, reg_path, &hKey);
+	LONG lResult = RegOpenKey(
+		HKEY_LOCAL_MACHINE,
+		reg_path,
+		&hKey);
 	if(lResult != ERROR_SUCCESS)
 	{
-		return subkeys;
+		return NULL;
 	}
+
+	keys = new std::list<std::string>();
 
 	retCode = RegQueryInfoKey(hKey, achClass, &cchClassName, NULL, &cSubKeys, &cbMaxSubKey, &cchMaxClass, &cValues, &cchMaxValue, &cbMaxValueData, &cbSecurityDescriptor, &ftLastWriteTime);
 	if(cSubKeys)
@@ -49,13 +59,15 @@ std::list<std::string> Localhost::listSubkeys(const char* reg_path)
 						 &ftLastWriteTime); 
 				if (retCode == ERROR_SUCCESS) 
 				{
-					subkeys.push_back(std::string(reg_path) + std::string("\\") + std::string(achKey));
+					keys->push_back(std::string(reg_path) + std::string("\\") + std::string(achKey));
 				}
 			}
 		} 
 	}
 
-	return subkeys;
+	RegCloseKey(hKey);
+
+	return keys;
 }
 
 std::string Localhost::getStringRegKey(HKEY hKey, const char* valueName)
@@ -128,8 +140,9 @@ void image_to_buffer_png(const CImage &image,  vectByte &png_buffer)
 
 
 
-SystemInfo Localhost::getSystemInfo()
+SystemInfo* Localhost::getSystemInfo()
 {
+	/*
 	SYSTEM_INFO siSysInfo;
 	GetSystemInfo(&siSysInfo);
 
@@ -139,52 +152,177 @@ SystemInfo Localhost::getSystemInfo()
 	GetVersionEx((LPOSVERSIONINFO)&osinfo);
 
 	return SystemInfo(siSysInfo.wProcessorArchitecture, siSysInfo.dwNumberOfProcessors, osinfo.dwMajorVersion, osinfo.dwMinorVersion, osinfo.dwBuildNumber, osinfo.wProductType);
+	*/
+
+	SystemInfo* system_info = NULL;
+
+	IWbemLocator* wbemLocator{ nullptr };
+	IWbemServices* wbemServices{ nullptr };
+
+	if (!initializeCom())
+		return NULL;
+
+	if (!setUpWBEM(wbemLocator, wbemServices))
+		return NULL;
+
+	// Step 6: --------------------------------------------------
+	// Use the IWbemServices pointer to make requests of WMI ----
+
+	BSTR bstr_wql = SysAllocString(L"WQL");
+	BSTR bstr_sql = SysAllocString(L"SELECT * FROM Win32_OperatingSystem");
+
+	// For example, get the name of the operating system
+	IEnumWbemClassObject* pEnumerator{ nullptr };
+	HRESULT hres = wbemServices->ExecQuery(
+		bstr_wql,
+		bstr_sql,
+		WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY,
+		nullptr,
+		&pEnumerator);
+
+	if (FAILED(hres))
+	{
+		wbemServices->Release();
+		wbemLocator->Release();
+		CoUninitialize();
+		return NULL;               // Program has failed.
+	}
+
+	// Step 7: -------------------------------------------------
+	// Get the data from the query in step 6 -------------------
+
+	IWbemClassObject* pclsObj{ nullptr };
+	ULONG uReturn = 0;
+
+	while (pEnumerator)
+	{
+		HRESULT hr = pEnumerator->Next(WBEM_INFINITE, 1, &pclsObj, &uReturn);
+
+		if (0 == uReturn)
+		{
+			break;
+		}
+
+		VARIANT vtProp;
+		// Get the value of the Name property
+		hr = pclsObj->Get(L"Name", 0, &vtProp, 0, 0);
+
+		if (FAILED(hr))
+			std::cout << "Failed to get name " << std::endl;
+
+		std::wstring name = std::wstring(vtProp.bstrVal);
+		std::wstring os_version = name.substr(0, name.find('|'));
+
+		VariantClear(&vtProp);
+
+		// Get the value of the BuildNumber property
+		hr = pclsObj->Get(L"BuildNumber", 0, &vtProp, 0, 0);
+
+		if (FAILED(hr))
+			std::cout << "Failed to get version " << std::endl;
+
+		std::wstring build = std::wstring(vtProp.bstrVal);
+
+		VariantClear(&vtProp);
+
+		// Get the value of the InstallDate property
+		hr = pclsObj->Get(L"InstallDate", 0, &vtProp, 0, 0);
+
+		if (FAILED(hr))
+			std::cout << "Failed to get version " << std::endl;
+
+		std::wstring date_str = std::wstring(vtProp.bstrVal);
+		std::wstring install_date = date_str.substr(0, 4) + L"-" + date_str.substr(4, 2) + L"-" + date_str.substr(6, 2) + L" " + date_str.substr(8, 2) + L":" + date_str.substr(10, 2);
+
+		VariantClear(&vtProp);
+
+		// Get the value of the LastBootUpTime property
+		hr = pclsObj->Get(L"LastBootUpTime", 0, &vtProp, 0, 0);
+
+		if (FAILED(hr))
+			std::cout << "Failed to get version " << std::endl;
+
+		date_str = std::wstring(vtProp.bstrVal);
+		std::wstring lastboot_date = date_str.substr(0, 4) + L"-" + date_str.substr(4, 2) + L"-" + date_str.substr(6, 2) + L" " + date_str.substr(8, 2) + L":" + date_str.substr(10, 2);
+
+		VariantClear(&vtProp);
+
+		// Get the value of the OSArchitecture property
+		hr = pclsObj->Get(L"OSArchitecture", 0, &vtProp, 0, 0);
+
+		if (FAILED(hr))
+			std::cout << "Failed to get version " << std::endl;
+
+		std::wstring os_arch = std::wstring(vtProp.bstrVal);
+
+		VariantClear(&vtProp);
+
+		pclsObj->Release();
+
+		system_info = new SystemInfo(os_version + L" Build " + build, os_arch, install_date, lastboot_date);
+	}
+
+	// Cleanup
+	// ========
+
+	wbemServices->Release();
+	wbemLocator->Release();
+	pEnumerator->Release();
+	CoUninitialize();
+
+	return system_info;
 }
 
 
 std::list<Application> Localhost::getApplications()
 {
 	std::list<Application> apps_list;
-
-	const char* reg_path = "Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
-
-	std::list<std::string> reg_keys = this->listSubkeys(reg_path);
-
 	std::list<std::string>::const_iterator it;
-	for (it = reg_keys.begin(); it != reg_keys.end(); it++)
+
+	const char* registry_path = "Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
+
+	std::list<std::string>* reg_keys = this->listSubKeys(registry_path);
+
+	if (reg_keys != NULL)
 	{
-		HKEY hKey = NULL;
-		LONG lResult = RegOpenKey(HKEY_LOCAL_MACHINE, (*it).c_str(), &hKey);
-		if (lResult == ERROR_SUCCESS)
+		for (it = reg_keys->begin(); it != reg_keys->end(); it++)
 		{
-			std::string app_name = this->getStringRegKey(hKey, "DisplayName");
-
-			if (strlen(app_name.c_str()) != 0)
+			HKEY hKey = NULL;
+			LONG lResult = RegOpenKey(HKEY_LOCAL_MACHINE, (*it).c_str(), &hKey);
+			if (lResult == ERROR_SUCCESS)
 			{
-				std::string app_version = this->getStringRegKey(hKey, "DisplayVersion");
+				std::string app_name = this->getStringRegKey(hKey, "DisplayName");
 
-				apps_list.push_back(Application(app_name, app_version));
+				if (strlen(app_name.c_str()) != 0)
+				{
+					std::string app_version = this->getStringRegKey(hKey, "DisplayVersion");
+
+					apps_list.push_back(Application(app_name, app_version));
+				}
 			}
 		}
 	}
 
-	reg_path = "Software\\Microsoft\\Windows\\CurrentVersion‌​\\Uninstall";
+	registry_path = "Software\\Microsoft\\Windows\\CurrentVersion‌​\\Uninstall";
 
-	reg_keys = this->listSubkeys(reg_path);
+	reg_keys = this->listSubKeys(registry_path);
 
-	for (it = reg_keys.begin(); it != reg_keys.end(); it++)
+	if (reg_keys != NULL)
 	{
-		HKEY hKey = NULL;
-		LONG lResult = RegOpenKey(HKEY_LOCAL_MACHINE, (*it).c_str(), &hKey);
-		if (lResult == ERROR_SUCCESS)
+		for (it = reg_keys->begin(); it != reg_keys->end(); it++)
 		{
-			std::string app_name = this->getStringRegKey(hKey, "DisplayName");
-
-			if (strlen(app_name.c_str()) != 0)
+			HKEY hKey = NULL;
+			LONG lResult = RegOpenKey(HKEY_LOCAL_MACHINE, (*it).c_str(), &hKey);
+			if (lResult == ERROR_SUCCESS)
 			{
-				std::string app_version = this->getStringRegKey(hKey, "DisplayVersion");
+				std::string app_name = this->getStringRegKey(hKey, "DisplayName");
 
-				apps_list.push_back(Application(app_name, app_version));
+				if (strlen(app_name.c_str()) != 0)
+				{
+					std::string app_version = this->getStringRegKey(hKey, "DisplayVersion");
+
+					apps_list.push_back(Application(app_name, app_version));
+				}
 			}
 		}
 	}
@@ -196,26 +334,29 @@ std::list<RDPServer> Localhost::getRDPServers()
 {
 	std::list<RDPServer> rdp_list;
 
-	const char* reg_path = "Software\Microsoft\Terminal Server Client\Servers";
+	const char* registry_path = "Software\\Microsoft\\Terminal Server Client\\Servers";
 
-	std::list<std::string> reg_keys = this->listSubkeys(reg_path);
+	std::list<std::string>* reg_keys = this->listSubKeys(registry_path);
 
-	std::list<std::string>::const_iterator it;
-	for (it = reg_keys.begin(); it != reg_keys.end(); it++)
+	if (reg_keys != NULL)
 	{
-		HKEY hKey = NULL;
-		LONG lResult = RegOpenKey(HKEY_LOCAL_MACHINE, (*it).c_str(), &hKey);
-		if (lResult == ERROR_SUCCESS)
+		std::list<std::string>::const_iterator it;
+		for (it = reg_keys->begin(); it != reg_keys->end(); it++)
 		{
-			std::string username = this->getStringRegKey(hKey, "UsernameHint");
-
-			char* pos = strstr((char*)(*it).c_str(), "\\");
-
-			std::string hostname = std::string(pos + 1);
-
-			if (strlen(username.c_str()) != 0)
+			HKEY hKey = NULL;
+			LONG lResult = RegOpenKey(HKEY_LOCAL_MACHINE, (*it).c_str(), &hKey);
+			if (lResult == ERROR_SUCCESS)
 			{
-				rdp_list.push_back(RDPServer(username, hostname));
+				std::string username = this->getStringRegKey(hKey, "UsernameHint");
+
+				char* pos = strstr((char*)(*it).c_str(), "\\");
+
+				std::string hostname = std::string(pos + 1);
+
+				if (strlen(username.c_str()) != 0)
+				{
+					rdp_list.push_back(RDPServer(username, hostname));
+				}
 			}
 		}
 	}
@@ -223,115 +364,12 @@ std::list<RDPServer> Localhost::getRDPServers()
 	return rdp_list;
 }
 
-SystemInfo::SystemInfo(WORD wProcessorArchitecture, DWORD dwNumberOfProcessors, DWORD dwMajorVersion, DWORD dwMinorVersion, DWORD dwBuildNumber, DWORD wProductType)
+SystemInfo::SystemInfo(std::wstring os_name, std::wstring os_arch, std::wstring install_date, std::wstring last_boot_date)
 {
-	if (wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64)
-	{
-		this->proc_arch = std::string("x64");
-	}
-	else if (wProcessorArchitecture == PROCESSOR_ARCHITECTURE_ARM)
-	{
-		this->proc_arch = std::string("ARM");
-	}
-	else if (wProcessorArchitecture == PROCESSOR_ARCHITECTURE_IA64)
-	{
-		this->proc_arch = std::string("Intel Itanium-based");
-	}
-	else if (wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL)
-	{
-		this->proc_arch = std::string("x86");
-	}
-	else if (wProcessorArchitecture == PROCESSOR_ARCHITECTURE_UNKNOWN)
-	{
-		this->proc_arch = std::string("Unknown architecture: ") + std::to_string(wProcessorArchitecture);
-	}
-
-	this->nb_procs = (unsigned int)dwNumberOfProcessors;
-
-	this->win_version = std::string("");
-	if (dwMajorVersion == 5)
-	{
-		if (dwMinorVersion == 0)
-		{
-			this->win_version = std::string("Windows 2000");
-		}
-		else if (dwMinorVersion == 1)
-		{
-			this->win_version = std::string("Windows XP");
-		}
-		else if (dwMinorVersion == 2)
-		{
-			this->win_version = std::string("Windows Server 2003");
-		}
-	}
-	else if (dwMajorVersion == 6)
-	{
-		if (dwMinorVersion == 0)
-		{
-			if (wProductType == VER_NT_WORKSTATION)
-			{
-				this->win_version = std::string("Windows Vista");
-			}
-			else
-			{
-				this->win_version = std::string("Windows Server 2008");
-			}
-		}
-		else if (dwMinorVersion == 1)
-		{
-			if (wProductType == VER_NT_WORKSTATION)
-			{
-				this->win_version = std::string("Windows 7");
-			}
-			else
-			{
-				this->win_version = std::string("Windows Server 2008 R2");
-			}
-		}
-		else if (dwMinorVersion == 2)
-		{
-			if (wProductType == VER_NT_WORKSTATION)
-			{
-				this->win_version = std::string("Windows 8");
-			}
-			else
-			{
-				this->win_version = std::string("Windows Server 2012");
-			}
-		}
-		else if (dwMinorVersion == 3)
-		{
-			if (wProductType == VER_NT_WORKSTATION)
-			{
-				this->win_version = std::string("Windows 8.1");
-			}
-			else
-			{
-				this->win_version = std::string("Windows Server 2012 R2");
-			}
-		}
-	}
-	else if (dwMajorVersion == 10)
-	{
-		if (dwMinorVersion == 0)
-		{
-			if (wProductType == VER_NT_WORKSTATION)
-			{
-				this->win_version = std::string("Windows 10");
-			}
-			else
-			{
-				this->win_version = std::string("Windows Server 2016");
-			}
-		}
-	}
-
-	if (this->win_version.size() == 0)
-	{
-		this->win_version = std::string("Unknown version: ") + std::to_string(dwMajorVersion) + "." + std::to_string(dwMinorVersion);
-	}
-
-	this->win_version += std::string(" Build ") + std::to_string(dwBuildNumber);
+	this->os_name = os_name;
+	this->os_arch = os_arch;
+	this->install_date = install_date;
+	this->last_boot_date = last_boot_date;
 }
 
 Application::Application(char* name, char* version)
@@ -350,4 +388,115 @@ RDPServer::RDPServer(std::string username, std::string server)
 {
 	this->username = username;
 	this->server = server;
+}
+
+bool initializeCom() {
+	// Step 1: --------------------------------------------------
+	// Initialize COM. ------------------------------------------
+
+	HRESULT hres = CoInitializeEx(0, COINIT_MULTITHREADED);
+	if (FAILED(hres))
+	{
+		std::cout << "Failed to initialize COM library. Error code = 0x"
+			<< std::hex << hres << std::endl;
+		return false;                  // Program has failed.
+	}
+
+	// Step 2: --------------------------------------------------
+	// Set general COM security levels --------------------------
+
+	hres = CoInitializeSecurity(
+		nullptr,
+		-1,                          // COM authentication
+		nullptr,                        // Authentication services
+		nullptr,                        // Reserved
+		RPC_C_AUTHN_LEVEL_DEFAULT,   // Default authentication 
+		RPC_C_IMP_LEVEL_IMPERSONATE, // Default Impersonation  
+		nullptr,                        // Authentication info
+		EOAC_NONE,                   // Additional capabilities 
+		nullptr                         // Reserved
+	);
+
+	if (FAILED(hres))
+	{
+		std::cout << "Failed to initialize security. Error code = 0x"
+			<< std::hex << hres << std::endl;
+		CoUninitialize();
+		return false;                    // Program has failed.
+	}
+	return true;
+}
+
+bool setUpWBEM(IWbemLocator*& wbemLocator, IWbemServices*& wbemServices) {
+	// Step 3: ---------------------------------------------------
+	// Obtain the initial locator to WMI -------------------------
+	HRESULT hres = CoCreateInstance(
+		CLSID_WbemLocator,
+		0,
+		CLSCTX_INPROC_SERVER,
+		IID_IWbemLocator, (LPVOID*)&wbemLocator);
+
+	if (FAILED(hres))
+	{
+		std::cout << "Failed to create IWbemLocator object."
+			<< " Err code = 0x"
+			<< std::hex << hres << std::endl;
+		CoUninitialize();
+		return false;                 // Program has failed.
+	}
+
+	// Step 4: -----------------------------------------------------
+	// Connect to WMI through the IWbemLocator::ConnectServer method
+
+	// Connect to the root\cimv2 namespace with
+	// the current user and obtain pointer wbemServices
+	// to make IWbemServices calls.
+
+	hres = wbemLocator->ConnectServer(
+		_bstr_t(L"ROOT\\CIMV2"), // Object path of WMI namespace
+		nullptr,                    // User name. NULL = current user
+		nullptr,                    // User password. NULL = current
+		0,                       // Locale. NULL indicates current
+		0,                    // Security flags.
+		0,                       // Authority (for example, Kerberos)
+		0,                       // Context object 
+		&wbemServices            // pointer to IWbemServices proxy
+	);
+
+	if (FAILED(hres))
+	{
+		std::cout << "Could not connect. Error code = 0x" << std::hex << hres << std::endl;
+		wbemLocator->Release();
+		CoUninitialize();
+		return false;                // Program has failed.
+	}
+
+	//std::cout << "Connected to ROOT\\CIMV2 WMI namespace" << std::endl;
+
+
+	// Step 5: --------------------------------------------------
+	// Set security levels on the proxy -------------------------
+
+	hres = CoSetProxyBlanket(
+		wbemServices,                // Indicates the proxy to set
+		RPC_C_AUTHN_WINNT,           // RPC_C_AUTHN_xxx
+		RPC_C_AUTHZ_NONE,            // RPC_C_AUTHZ_xxx
+		nullptr,                        // Server principal name 
+		RPC_C_AUTHN_LEVEL_CALL,      // RPC_C_AUTHN_LEVEL_xxx 
+		RPC_C_IMP_LEVEL_IMPERSONATE, // RPC_C_IMP_LEVEL_xxx
+		nullptr,                        // client identity
+		EOAC_NONE                    // proxy capabilities 
+	);
+
+	if (FAILED(hres))
+	{
+		std::cout << "Could not set proxy blanket. Error code = 0x"
+			<< std::hex << hres << std::endl;
+		wbemServices->Release();
+		wbemLocator->Release();
+		CoUninitialize();
+		return false;               // Program has failed.
+	}
+
+	return true;
 }
