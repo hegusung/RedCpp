@@ -19,6 +19,7 @@
 #include <olectl.h> 
 #include <Wbemidl.h>
 #include <comdef.h>
+#include <tlhelp32.h>
 
 # pragma comment(lib, "wbemuuid.lib")
 
@@ -46,6 +47,16 @@ public:
 	std::string version;
 };
 
+class Process
+{
+public:
+	Process(const char* exe_name, const char* exe_path, unsigned int pid, unsigned int parent_pid);
+	std::string exe_name;
+	std::string exe_path;
+	unsigned int pid;
+	unsigned int parent_pid;
+};
+
 class RDPServer
 {
 public:
@@ -59,9 +70,10 @@ class Localhost
 public:
 	Localhost();
 	~Localhost();
-	SystemInfo* getSystemInfo();
-	std::list<Application> getApplications();
-	std::list<RDPServer> getRDPServers();
+	SystemInfo* get_system_info();
+	std::list<Process> list_processes();
+	std::list<Application> list_applications();
+	std::list<RDPServer> list_rdp_servers();
 	// registry
 	std::list<std::string>* listSubKeys(const char* reg_path);
 	std::string getStringRegKey(HKEY hKey, const char* valueName);

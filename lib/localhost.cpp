@@ -140,20 +140,8 @@ void image_to_buffer_png(const CImage &image,  vectByte &png_buffer)
 
 
 
-SystemInfo* Localhost::getSystemInfo()
+SystemInfo* Localhost::get_system_info()
 {
-	/*
-	SYSTEM_INFO siSysInfo;
-	GetSystemInfo(&siSysInfo);
-
-	OSVERSIONINFOEX osinfo;
-	osinfo.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX);
-#pragma warning(suppress : 4996)
-	GetVersionEx((LPOSVERSIONINFO)&osinfo);
-
-	return SystemInfo(siSysInfo.wProcessorArchitecture, siSysInfo.dwNumberOfProcessors, osinfo.dwMajorVersion, osinfo.dwMinorVersion, osinfo.dwBuildNumber, osinfo.wProductType);
-	*/
-
 	SystemInfo* system_info = NULL;
 
 	IWbemLocator* wbemLocator{ nullptr };
@@ -273,8 +261,120 @@ SystemInfo* Localhost::getSystemInfo()
 	return system_info;
 }
 
+std::list<Process> Localhost::list_processes()
+{
+	std::list<Process> proc_list;
 
-std::list<Application> Localhost::getApplications()
+	HANDLE hProcessSnap;
+	HANDLE hProcess;
+	PROCESSENTRY32 pe32;
+	DWORD dwPriorityClass;
+
+	// Take a snapshot of all processes in the system.
+	hProcessSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+	if (hProcessSnap == INVALID_HANDLE_VALUE)
+	{
+#ifdef DEBUG
+		printf("CreateToolhelp32Snapshot error: INVALID HANDLE: %d\n", GetLastError());
+#endif
+		return proc_list;
+	}
+
+	// Set the size of the structure before using it.
+	pe32.dwSize = sizeof(PROCESSENTRY32);
+
+	// Retrieve information about the first process,
+	// and exit if unsuccessful
+	if (!Process32First(hProcessSnap, &pe32))
+	{
+#ifdef DEBUG
+		printf("Process32First error: %d\n", GetLastError());
+#endif
+		CloseHandle(hProcessSnap);          // clean the snapshot object
+		return proc_list;
+	}
+
+	// Now walk the snapshot of processes, and
+	// display information about each process in turn
+	do
+	{
+		std::string proc_path = "";
+		
+		HANDLE hModuleSnap = INVALID_HANDLE_VALUE;
+		MODULEENTRY32 me32;
+
+		// Take a snapshot of all modules in the specified process.
+		hModuleSnap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, pe32.th32ProcessID);
+		if (hModuleSnap == INVALID_HANDLE_VALUE)
+		{
+#ifdef DEBUG
+			printf("CreateToolhelp32Snapshot error: %d\n", GetLastError());
+#endif
+
+		}
+		else 
+		{
+			// Set the size of the structure before using it.
+			me32.dwSize = sizeof(MODULEENTRY32);
+
+			// Retrieve information about the first module,
+			// and exit if unsuccessful
+			if (!Module32First(hModuleSnap, &me32))
+			{
+#ifdef DEBUG
+				printf("Module32First error: %d\n", GetLastError());
+#endif
+
+				CloseHandle(hModuleSnap);           // clean the snapshot object
+			}
+			else
+			{
+
+				// Now walk the module list of the process,
+				// and display information about each module
+				do
+				{
+					if (strcmp(pe32.szExeFile, me32.szModule) == 0)
+					{
+						proc_path = std::string(me32.szExePath);
+
+						break;
+					}
+
+				} while (Module32Next(hModuleSnap, &me32));
+
+				CloseHandle(hModuleSnap);
+			}
+
+		}
+
+
+
+		proc_list.push_back(Process(pe32.szExeFile, proc_path.c_str(), pe32.th32ProcessID, pe32.th32ParentProcessID));
+
+		/*
+		_tprintf(TEXT("\n\n====================================================="));
+		_tprintf(TEXT("\nPROCESS NAME:  %s"), pe32.szExeFile);
+		_tprintf(TEXT("\n-------------------------------------------------------"));
+		*/
+
+		/*
+		_tprintf(TEXT("\n  Process ID        = 0x%08X"), pe32.th32ProcessID);
+		_tprintf(TEXT("\n  Thread count      = %d"), pe32.cntThreads);
+		_tprintf(TEXT("\n  Parent process ID = 0x%08X"), pe32.th32ParentProcessID);
+		_tprintf(TEXT("\n  Priority base     = %d"), pe32.pcPriClassBase);
+		if (dwPriorityClass)
+			_tprintf(TEXT("\n  Priority class    = %d"), dwPriorityClass);
+		*/
+
+
+	} while (Process32Next(hProcessSnap, &pe32));
+
+	CloseHandle(hProcessSnap);
+	return proc_list;
+}
+
+std::list<Application> Localhost::list_applications()
 {
 	std::list<Application> apps_list;
 	std::list<std::string>::const_iterator it;
@@ -330,7 +430,7 @@ std::list<Application> Localhost::getApplications()
 	return apps_list;
 }
 
-std::list<RDPServer> Localhost::getRDPServers()
+std::list<RDPServer> Localhost::list_rdp_servers()
 {
 	std::list<RDPServer> rdp_list;
 
@@ -499,4 +599,12 @@ bool setUpWBEM(IWbemLocator*& wbemLocator, IWbemServices*& wbemServices) {
 	}
 
 	return true;
+}
+
+Process::Process(const char* exe_name, const char* exe_path, unsigned int pid, unsigned int parent_pid)
+{
+	this->exe_name = std::string(exe_name);
+	this->exe_path = std::string(exe_path);
+	this->pid = pid;
+	this->parent_pid = parent_pid;
 }

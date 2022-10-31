@@ -11,7 +11,7 @@ void getSystemInfo()
 {
 	Localhost host = Localhost();
 
-	SystemInfo* systeminfo = host.getSystemInfo();
+	SystemInfo* systeminfo = host.get_system_info();
 
 	if (systeminfo != NULL)
 	{
@@ -27,7 +27,7 @@ void getSystemInfo()
 	}
 
 
-	std::list<Application> apps = host.getApplications();
+	std::list<Application> apps = host.list_applications();
 
 	printf("Applications:\n");
 	for (std::list<Application>::iterator iterator = apps.begin(), end = apps.end(); iterator != end; ++iterator)
@@ -38,7 +38,7 @@ void getSystemInfo()
 	}
 
 	printf("RDP servers:\n");
-	std::list<RDPServer> rdp_list = host.getRDPServers();
+	std::list<RDPServer> rdp_list = host.list_rdp_servers();
 	for (std::list<RDPServer>::iterator iterator = rdp_list.begin(), end = rdp_list.end(); iterator != end; ++iterator)
 	{
 		RDPServer rdp = *iterator;
@@ -94,6 +94,21 @@ void getSelfHash()
 
 }
 
+void listProcesses()
+{
+	Localhost host = Localhost();
+
+	std::list<Process> procs = host.list_processes();
+
+	printf("Processes:\n");
+	for (std::list<Process>::iterator iterator = procs.begin(), end = procs.end(); iterator != end; ++iterator)
+	{
+		Process proc = *iterator;
+
+		printf(" - [%d -> %d] %s (%s)\n", proc.parent_pid, proc.pid, proc.exe_name.c_str(), proc.exe_path.c_str());
+	}
+}
+
 int main()
 {
 	getSystemInfo();
@@ -105,5 +120,9 @@ int main()
 	printf("\n==========================================\n\n");
 
 	getSelfHash();
+
+	printf("\n==========================================\n\n");
+
+	listProcesses();
 }
 
