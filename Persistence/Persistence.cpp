@@ -236,9 +236,9 @@ void set_link_persistence()
 
 int main()
 {
-	/*
-	set_run_key_persistence();
 
+	set_run_key_persistence();
+	/*
 	printf("\n==========================================\n\n");
 
 	set_service_persistence();
@@ -248,7 +248,7 @@ int main()
 	set_task_persistence();
 
 	printf("\n==========================================\n\n");
-	*/
 
 	set_link_persistence();
+	*/
 }

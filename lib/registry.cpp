@@ -16,6 +16,10 @@ Registry::~Registry()
 bool Registry::get_path(const char* reg_path, HKEY* root, const char** reg_subpath)
 {
     const char* backslash = strstr(reg_path, "\\");
+    if (backslash == 0)
+    {
+        return false;
+    }
 
     if (memcmp(reg_path, "HKEY_CLASSES_ROOT", sizeof("HKEY_CLASSES_ROOT") - 1) == 0)
     {
@@ -171,13 +175,17 @@ bool Registry::set_registry(const char* reg_path, const char* name, const char* 
     HKEY hkey;
     HKEY root;
     const char* sub_reg_path;
+    printf("A\n");
     bool success = this->get_path(reg_path, &root, &sub_reg_path);
+    printf("B\n");
     if (!success)
     {
+        printf("D\n");
         return NULL;
     }
 
     DWORD dwDisposition;
+    printf("C\n");
     if (RegCreateKeyExA(root, sub_reg_path, 0, NULL, 0, KEY_WRITE, NULL, &hkey, &dwDisposition) == ERROR_SUCCESS) {
         DWORD dwType, dwSize;
         dwType = REG_DWORD;

