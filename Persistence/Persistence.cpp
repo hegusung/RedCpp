@@ -185,7 +185,7 @@ void set_link_persistence()
 {
 	Links links = Links();
 
-	bool success = links.create_startup_folder_link("Test", "Test task", "C:\\test.exe");
+	bool success = links.create_startup_folder_link("Test", "Test task", "C:\\test.exe", "");
 	if (success)
 	{
 		printf("Successfully created startup folder link\n");
@@ -201,7 +201,7 @@ void set_link_persistence()
 	{
 		std::string userpath = std::string(buf);
 
-		printf("Tasks:\n");
+		printf("Links:\n");
 		std::list<Link>* link_list = links.list_links(userpath, true);
 		if (link_list != NULL)
 		{
@@ -210,6 +210,7 @@ void set_link_persistence()
 				printf(" - %s\n", (*iterator).lnk_path.c_str());
 				printf("     Description: %s\n", (*iterator).lnk_description.c_str());
 				printf("     Target     : %s\n", (*iterator).lnk_target.c_str());
+				printf("     Args       : %s\n", (*iterator).lnk_args.c_str());
 			}
 
 			delete link_list;
@@ -236,9 +237,9 @@ void set_link_persistence()
 
 int main()
 {
-
-	set_run_key_persistence();
 	/*
+	set_run_key_persistence();
+	
 	printf("\n==========================================\n\n");
 
 	set_service_persistence();
@@ -248,7 +249,6 @@ int main()
 	set_task_persistence();
 
 	printf("\n==========================================\n\n");
-
-	set_link_persistence();
 	*/
+	set_link_persistence();
 }

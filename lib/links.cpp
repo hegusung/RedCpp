@@ -96,10 +96,11 @@ void Links::get_link_info(std::string path, std::list<Link>* link_list)
             if (SUCCEEDED(hres))
             {
                 std::string lnk_path = "";
+                std::string lnk_args = "";
                 std::string lnk_description = "";
 
                 // Get the path to the link target. 
-                hres = psl->GetPath(szGotPath, MAX_PATH, &wfd, SLGP_SHORTPATH);
+                hres = psl->GetPath(szGotPath, MAX_PATH, &wfd, SLGP_RAWPATH);
                 if (SUCCEEDED(hres))
                 {
                     lnk_path = std::string((char*)szGotPath);
@@ -112,7 +113,14 @@ void Links::get_link_info(std::string path, std::list<Link>* link_list)
                     lnk_description = std::string((char*)szDescription);
                 }
 
-                link_list->push_back(Link(path.c_str(), lnk_description.c_str(), lnk_path.c_str()));
+                // Get the path to the link target. 
+                hres = psl->GetArguments(szGotPath, MAX_PATH);
+                if (SUCCEEDED(hres))
+                {
+                    lnk_args = std::string((char*)szGotPath);
+                }
+
+                link_list->push_back(Link(path.c_str(), lnk_description.c_str(), lnk_path.c_str(), lnk_args.c_str()));
             }
 
             // Release the pointer to the IPersistFile interface. 
@@ -124,7 +132,7 @@ void Links::get_link_info(std::string path, std::list<Link>* link_list)
     }
 }
 
-bool Links::create_startup_folder_link(const char* lnk_name, const char* lnk_description, const char* lnk_target)
+bool Links::create_startup_folder_link(const char* lnk_name, const char* lnk_description, const char* lnk_target, const char* lnk_args)
 {
     bool success = false;
     PWSTR pszPath;
@@ -154,6 +162,7 @@ bool Links::create_startup_folder_link(const char* lnk_name, const char* lnk_des
 
             // Set the path to the shortcut target and add the description. 
             psl->SetPath(lnk_target);
+            psl->SetArguments(lnk_args);
             psl->SetDescription(lnk_description);
 
             // Query IShellLink for the IPersistFile interface, used for saving the 
@@ -231,11 +240,12 @@ bool Links::remove_startup_folder_link(const char* lnk_name)
     return success;
 }
 
-Link::Link(const char* lnk_path, const char* lnk_description, const char* lnk_target)
+Link::Link(const char* lnk_path, const char* lnk_description, const char* lnk_target, const char* lnk_args)
 {
     this->lnk_path = std::string(lnk_path);
     this->lnk_description = std::string(lnk_description);
     this->lnk_target = std::string(lnk_target);
+    this->lnk_args = std::string(lnk_args);
 }
 
 bool ends_with(std::wstring const& value, std::wstring const& ending)

