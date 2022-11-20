@@ -17,10 +17,12 @@ WMI::~WMI()
 
 bool WMI::execute(const char* host, const char* username, const char* password, const char* command)
 {
-	IWbemLocator* wbemLocator{ nullptr };
-	IWbemServices* wbemServices{ nullptr };
+	IWbemLocator* wbemLocator = NULL;
+	IWbemServices* wbemServices = NULL;
 
-	this->setUpWBEM(host, username, password, wbemLocator, wbemServices);
+	bool success = this->setUpWBEM(host, username, password, &wbemLocator, &wbemServices);
+	if (!success)
+		return false;
 
 	// Step 7: --------------------------------------------------
 // Use the IWbemServices pointer to make requests of WMI ----
@@ -44,7 +46,6 @@ bool WMI::execute(const char* host, const char* username, const char* password, 
 
 		return false;               // Program has failed.
 	}
-
 
 	IWbemClassObject* pInParamsDefinition = NULL;
 	hres = pClass->GetMethod(MethodName, 0,
@@ -162,14 +163,14 @@ bool WMI::initializeCom() {
 	return true;
 }
 
-bool WMI::setUpWBEM(const char* host, const char* username, const char* password, IWbemLocator*& wbemLocator, IWbemServices*& wbemServices) {
+bool WMI::setUpWBEM(const char* host, const char* username, const char* password, IWbemLocator** wbemLocator, IWbemServices** wbemServices) {
 	// Step 3: ---------------------------------------------------
 	// Obtain the initial locator to WMI -------------------------
 	HRESULT hres = CoCreateInstance(
 		CLSID_WbemLocator,
 		0,
 		CLSCTX_INPROC_SERVER,
-		IID_IWbemLocator, (LPVOID*)&wbemLocator);
+		IID_IWbemLocator, (LPVOID*)wbemLocator);
 
 	if (FAILED(hres))
 	{
@@ -194,7 +195,7 @@ bool WMI::setUpWBEM(const char* host, const char* username, const char* password
 
 	if (host == NULL)
 	{
-		hres = wbemLocator->ConnectServer(
+		hres = (*wbemLocator)->ConnectServer(
 			_bstr_t(L"ROOT\\CIMV2"), // Object path of WMI namespace
 			nullptr,                    // User name. NULL = current user
 			nullptr,                    // User password. NULL = current
@@ -202,7 +203,7 @@ bool WMI::setUpWBEM(const char* host, const char* username, const char* password
 			0,                    // Security flags.
 			0,                       // Authority (for example, Kerberos)
 			0,                       // Context object 
-			&wbemServices            // pointer to IWbemServices proxy
+			wbemServices            // pointer to IWbemServices proxy
 		);
 	}
 	else
@@ -215,9 +216,13 @@ bool WMI::setUpWBEM(const char* host, const char* username, const char* password
 			MultiByteToWideChar(CP_ACP, 0, username, -1, w_username, MAX_PATH);
 			MultiByteToWideChar(CP_ACP, 0, password, -1, w_password, MAX_PATH);
 
+			wprintf(L"Path: %s\n", w_namespace);
+			wprintf(L"User: %s\n", w_username);
+			wprintf(L"Pass: %s\n", w_password);
+
 			// Connect to the local root\cimv2 namespace
 			// and obtain pointer pSvc to make IWbemServices calls.
-			hres = wbemLocator->ConnectServer(
+			hres = (*wbemLocator)->ConnectServer(
 				_bstr_t(w_namespace),
 				_bstr_t(w_username),
 				_bstr_t(w_password),
@@ -225,14 +230,16 @@ bool WMI::setUpWBEM(const char* host, const char* username, const char* password
 				NULL,
 				0,
 				0,
-				&wbemServices
+				wbemServices
 			);
+
+			printf("HRES: %x\n", hres);
 		}
 		else
 		{
 			// Connect to the local root\cimv2 namespace
 			// and obtain pointer pSvc to make IWbemServices calls.
-			hres = wbemLocator->ConnectServer(
+			hres = (*wbemLocator)->ConnectServer(
 				_bstr_t(w_namespace),
 				NULL,
 				NULL,
@@ -240,7 +247,7 @@ bool WMI::setUpWBEM(const char* host, const char* username, const char* password
 				NULL,
 				0,
 				0,
-				&wbemServices
+				wbemServices
 			);
 		}
 	}
@@ -248,13 +255,12 @@ bool WMI::setUpWBEM(const char* host, const char* username, const char* password
 	if (FAILED(hres))
 	{
 		std::cout << "Could not connect. Error code = 0x" << std::hex << hres << std::endl;
-		wbemLocator->Release();
+		(*wbemLocator)->Release();
 		CoUninitialize();
 		return false;                // Program has failed.
 	}
 
 	//std::cout << "Connected to ROOT\\CIMV2 WMI namespace" << std::endl;
-
 
 	// Step 5: --------------------------------------------------
 	// Set security levels on the proxy -------------------------
@@ -262,7 +268,7 @@ bool WMI::setUpWBEM(const char* host, const char* username, const char* password
 	if (host == NULL)
 	{
 		hres = CoSetProxyBlanket(
-			wbemServices,                // Indicates the proxy to set
+			*wbemServices,                // Indicates the proxy to set
 			RPC_C_AUTHN_WINNT,           // RPC_C_AUTHN_xxx
 			RPC_C_AUTHZ_NONE,            // RPC_C_AUTHZ_xxx
 			nullptr,                        // Server principal name 
@@ -307,7 +313,7 @@ bool WMI::setUpWBEM(const char* host, const char* username, const char* password
 		}
 
 		hres = CoSetProxyBlanket(
-			wbemServices,                           // Indicates the proxy to set
+			*wbemServices,                           // Indicates the proxy to set
 			RPC_C_AUTHN_DEFAULT,            // RPC_C_AUTHN_xxx
 			RPC_C_AUTHZ_DEFAULT,            // RPC_C_AUTHZ_xxx
 			COLE_DEFAULT_PRINCIPAL,         // Server principal name 
@@ -322,8 +328,8 @@ bool WMI::setUpWBEM(const char* host, const char* username, const char* password
 	{
 		std::cout << "Could not set proxy blanket. Error code = 0x"
 			<< std::hex << hres << std::endl;
-		wbemServices->Release();
-		wbemLocator->Release();
+		(*wbemServices)->Release();
+		(*wbemLocator)->Release();
 		CoUninitialize();
 		return false;               // Program has failed.
 	}

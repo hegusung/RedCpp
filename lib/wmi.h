@@ -23,7 +23,7 @@ public:
 	~WMI();
 	bool initializeCom();
 	bool execute(const char* host, const char* username, const char* password, const char* command);
-	bool setUpWBEM(const char* host, const char* username, const char* password, IWbemLocator*& wbemLocator, IWbemServices*& wbemServices);
+	bool setUpWBEM(const char* host, const char* username, const char* password, IWbemLocator** wbemLocator, IWbemServices** wbemServices);
 private:
 
 };

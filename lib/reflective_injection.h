@@ -6,9 +6,13 @@
 #define REFLECTIVE_INJECTION_HEADER
 
 #include <stdio.h>
+#include <vector>
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+
+#include <tlhelp32.h>
+
 
 // we declare some common stuff in here...
 
@@ -29,9 +33,19 @@
 typedef ULONG_PTR(WINAPI* REFLECTIVELOADER)(VOID);
 typedef BOOL(WINAPI* DLLMAIN)(HINSTANCE, DWORD, LPVOID);
 
-BOOL InjectToProcess(DWORD dwProcessId, LPVOID lpBuffer, DWORD dwLength);
 DWORD GetReflectiveLoaderOffset(VOID* lpReflectiveDllBuffer);
 HMODULE WINAPI LoadLibraryR(LPVOID lpBuffer, DWORD dwLength);
-HANDLE WINAPI LoadRemoteLibraryR(HANDLE hProcess, LPVOID lpBuffer, DWORD dwLength, LPVOID lpParameter);
+
+BOOL InjectToProcess_CreateRemoteThread(DWORD dwProcessId, LPVOID lpBuffer, DWORD dwLength);
+HANDLE WINAPI LoadRemoteLibraryR_CreateRemoteThread(HANDLE hProcess, LPVOID lpBuffer, DWORD dwLength, LPVOID lpParameter);
+BOOL InjectToProcess_NtCreateThreadEx(DWORD dwProcessId, LPVOID lpBuffer, DWORD dwLength);
+HANDLE WINAPI LoadRemoteLibraryR_NtCreateThreadEx(HANDLE hProcess, LPVOID lpBuffer, DWORD dwLength, LPVOID lpParameter);
+BOOL InjectToProcess_pfnRtlCreateUserThread(DWORD dwProcessId, LPVOID lpBuffer, DWORD dwLength);
+HANDLE WINAPI LoadRemoteLibraryR_pfnRtlCreateUserThread(HANDLE hProcess, LPVOID lpBuffer, DWORD dwLength, LPVOID lpParameter);
+BOOL InjectToProcess_QueueUserAPC(DWORD dwProcessId, LPVOID lpBuffer, DWORD dwLength);
+DWORD WINAPI LoadRemoteLibraryR_QueueUserAPC(DWORD processId, HANDLE hProcess, LPVOID lpBuffer, DWORD dwLength, LPVOID lpParameter);
+BOOL InjectToProcess_SetThreadContext(DWORD dwProcessId, LPVOID lpBuffer, DWORD dwLength);
+DWORD WINAPI LoadRemoteLibraryR_SetThreadContext(DWORD processId, HANDLE hProcess, LPVOID lpBuffer, DWORD dwLength, LPVOID lpParameter);
+
 
 #endif

@@ -423,9 +423,9 @@ bool Spawn::start_process_hollowing(const char* exe_path, LPVOID exe_data, unsig
 	return false;
 }
 
-bool Spawn::reflective_injection(unsigned int pid, LPVOID exe_data, size_t exe_data_size)
+bool Spawn::reflective_injection_CreateRemoteThread(unsigned int pid, LPVOID exe_data, size_t exe_data_size)
 {
-	BOOL success = InjectToProcess(pid, exe_data, exe_data_size);
+	BOOL success = InjectToProcess_CreateRemoteThread(pid, exe_data, exe_data_size);
 
 	if (success == TRUE)
 		return true;
@@ -433,3 +433,42 @@ bool Spawn::reflective_injection(unsigned int pid, LPVOID exe_data, size_t exe_d
 		return false;
 }
 
+bool Spawn::reflective_injection_NtCreateThreadEx(unsigned int pid, LPVOID exe_data, size_t exe_data_size)
+{
+	BOOL success = InjectToProcess_NtCreateThreadEx(pid, exe_data, exe_data_size);
+
+	if (success == TRUE)
+		return true;
+	else
+		return false;
+}
+
+bool Spawn::reflective_injection_pfnRtlCreateUserThread(unsigned int pid, LPVOID exe_data, size_t exe_data_size)
+{
+	BOOL success = InjectToProcess_pfnRtlCreateUserThread(pid, exe_data, exe_data_size);
+
+	if (success == TRUE)
+		return true;
+	else
+		return false;
+}
+
+bool Spawn::reflective_injection_QueueUserAPC(unsigned int pid, LPVOID exe_data, size_t exe_data_size)
+{
+	BOOL success = InjectToProcess_QueueUserAPC(pid, exe_data, exe_data_size);
+
+	if (success == TRUE)
+		return true;
+	else
+		return false;
+}
+
+bool Spawn::reflective_injection_SetThreadContext(unsigned int pid, LPVOID exe_data, size_t exe_data_size)
+{
+	BOOL success = InjectToProcess_SetThreadContext(pid, exe_data, exe_data_size);
+
+	if (success == TRUE)
+		return true;
+	else
+		return false;
+}

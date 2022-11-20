@@ -96,8 +96,6 @@ int main()
     host.deauth("\\\\192.168.0.151");
 
     char* output = NULL;
-    
-    char* output = NULL;
     host.RCE_wmi_output(&output, "ipconfig", "domain.local\\user", "password", (size_t)(30 * 1000));
     if (output != NULL)
         printf("> %s\n", output);

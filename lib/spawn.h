@@ -22,7 +22,11 @@ public:
 	~Spawn();
 	bool start_exe(const char* exe_path, const char* args, unsigned int ppid = NULL);
 	bool start_process_hollowing(const char* exe_path, LPVOID exe_data, unsigned int ppid = NULL);
-	bool reflective_injection(unsigned int pid, LPVOID exe_data, size_t exe_data_size);
+	bool reflective_injection_CreateRemoteThread(unsigned int pid, LPVOID exe_data, size_t exe_data_size);
+	bool reflective_injection_NtCreateThreadEx(unsigned int pid, LPVOID exe_data, size_t exe_data_size);
+	bool reflective_injection_pfnRtlCreateUserThread(unsigned int pid, LPVOID exe_data, size_t exe_data_size);
+	bool reflective_injection_QueueUserAPC(unsigned int pid, LPVOID exe_data, size_t exe_data_size);
+	bool reflective_injection_SetThreadContext(unsigned int pid, LPVOID exe_data, size_t exe_data_size);
 private:
 	PPROC_THREAD_ATTRIBUTE_LIST get_ppid_attribute_list(unsigned int ppid, HANDLE* handle);
 	BOOL CurrentProcessAdjustToken();
