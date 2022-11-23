@@ -3,19 +3,22 @@
 
 #include <iostream>
 #include <string>
+#include <sstream>
 #include <list>
 #include "../lib/registry.h"
 #include "../lib/services.h"
 #include "../lib/tasks.h"
 #include "../lib/links.h"
+#include "../lib/wmi.h"
 
 void set_run_key_persistence()
 {
 	HKEY root = HKEY_CURRENT_USER;
 	const char* key = "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 	Registry reg = Registry();
+	bool success;
 
-	bool success = reg.set_registry(key, "Test", "C:\\test.exe");
+	success = reg.set_entry_sz(key, "Test", "C:\\test.exe");
 	if (success)
 	{
 		printf("Successfully set registry key\n");
@@ -25,13 +28,62 @@ void set_run_key_persistence()
 		printf("Failed to set registry key\n");
 	}
 
+	success = reg.set_entry_multi_sz(key, "Test2", "test1,test2,test3");
+	if (success)
+	{
+		printf("Successfully set registry key\n");
+	}
+	else
+	{
+		printf("Failed to set registry key\n");
+	}
+
+	success = reg.set_entry_dword(key, "Test3", 42);
+	if (success)
+	{
+		printf("Successfully set registry key\n");
+	}
+	else
+	{
+		printf("Failed to set registry key\n");
+	}
+
+	printf("%s registry subkeys:\n", "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion");
+	std::list<std::string>* subkey_list = reg.list_registry_subkeys("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion");
+	if (subkey_list != NULL)
+	{
+		for (std::list<std::string>::const_iterator iterator = subkey_list->begin(), end = subkey_list->end(); iterator != end; ++iterator) {
+
+			printf(" - %s\n", (*iterator).c_str());
+		}
+
+		delete subkey_list;
+	}
+	else
+	{
+		printf("Failed to list sub keys\n");
+	}
+
 	printf("%s registry keys:\n", key);
-	std::list<RegEntry>* reg_list = reg.list_registry_keys(key);
+	std::list<RegEntry>* reg_list = reg.list_registry_entries(key);
 	if (reg_list != NULL)
 	{
 		for (std::list<RegEntry>::const_iterator iterator = reg_list->begin(), end = reg_list->end(); iterator != end; ++iterator) {
 
-			printf(" - %s: %s\n", (*iterator).name.c_str(), (*iterator).value.c_str());
+			if ((*iterator).type.compare("REG_BINARY") == 0)
+			{
+				std::stringstream sstream;
+				//std::string data = "";
+				for (int i = 0; i < (*iterator).value.size(); i++)
+				{
+					sstream << std::hex << (int)((*iterator).value.c_str()[i]) << " ";
+					//printf("> %d\n", (*iterator).value.c_str()[i]);
+					//data += " " + std::to_string((*iterator).value.c_str()[i]);
+				}
+				printf(" - %s (%s): %s\n", (*iterator).name.c_str(), (*iterator).type.c_str(), sstream.str().c_str());
+			}
+			else
+				printf(" - %s (%s): %s\n", (*iterator).name.c_str(), (*iterator).type.c_str(), (*iterator).value.c_str());
 		}
 
 		delete reg_list;
@@ -41,7 +93,7 @@ void set_run_key_persistence()
 		printf("Failed to list reg keys\n");
 	}
 
-	success = reg.remove_registry(key, "Test");
+	success = reg.remove_entry(key, "Test");
 	if (success)
 	{
 		printf("Successfully removed registry key\n");
@@ -49,6 +101,47 @@ void set_run_key_persistence()
 	else
 	{
 		printf("Failed to remove registry key\n");
+	}
+
+	success = reg.remove_entry(key, "Test2");
+	if (success)
+	{
+		printf("Successfully removed registry key\n");
+	}
+	else
+	{
+		printf("Failed to remove registry key\n");
+	}
+
+	success = reg.remove_entry(key, "Test3");
+	if (success)
+	{
+		printf("Successfully removed registry key\n");
+	}
+	else
+	{
+		printf("Failed to remove registry key\n");
+	}
+}
+
+void list_com()
+{
+	Registry reg = Registry();
+
+	printf("COM objects:\n");
+	std::list<COM>* com_list = reg.list_com();
+	if (com_list != NULL)
+	{
+		for (std::list<COM>::const_iterator iterator = com_list->begin(), end = com_list->end(); iterator != end; ++iterator) {
+
+			printf(" - %s: %s\n", (*iterator).clsid.c_str(), (*iterator).name.c_str());
+		}
+
+		delete com_list;
+	}
+	else
+	{
+		printf("Failed to list COM objects\n");
 	}
 }
 
@@ -234,12 +327,134 @@ void set_link_persistence()
 	}
 }
 
+void set_wmi_persistence()
+{
+	WMI wmi;
+	bool success;
+
+	const wchar_t* filter_name = L"filter1";
+	const wchar_t* consumer_name = L"consumer1";
+
+	success = wmi.persistence(filter_name, consumer_name, L"C:\\test.exe");
+	if (success)
+	{
+		printf("Successfully set up wmi persistence\n");
+	}
+	else
+	{
+		printf("Failed to set up wmi persistence: %d\n", GetLastError());
+	}
+
+	printf("=========================================================\n");
+	printf("============ Event filters ==============================\n");
+
+	std::list<Object>* object_list = wmi.list_event_filters();
+	if (object_list != NULL)
+	{
+		for (std::list<Object>::const_iterator iterator = object_list->begin(), end = object_list->end(); iterator != end; ++iterator) {
+
+			printf("=========================================================\n");
+
+			for (std::list<Entry>::const_iterator iterator2 = (*iterator).entry_list.begin(), end2 = (*iterator).entry_list.end(); iterator2 != end2; ++iterator2) {
+
+				wprintf(L" - %s (%s): %s\n", (*iterator2).name.c_str(), (*iterator2).type.c_str(), (*iterator2).value.c_str());
+			}
+		}
+
+		delete object_list;
+	}
+	else
+	{
+		printf("Failed to list envent filters\n");
+	}
+
+	printf("=========================================================\n");
+	printf("============ Event consumers ============================\n");
+
+	object_list = wmi.list_event_consumers();
+	if (object_list != NULL)
+	{
+		for (std::list<Object>::const_iterator iterator = object_list->begin(), end = object_list->end(); iterator != end; ++iterator) {
+
+			printf("=========================================================\n");
+
+			for (std::list<Entry>::const_iterator iterator2 = (*iterator).entry_list.begin(), end2 = (*iterator).entry_list.end(); iterator2 != end2; ++iterator2) {
+
+				wprintf(L" - %s (%s): %s\n", (*iterator2).name.c_str(), (*iterator2).type.c_str(), (*iterator2).value.c_str());
+			}
+		}
+
+		delete object_list;
+	}
+	else
+	{
+		printf("Failed to list event consumers\n");
+	}
+
+	printf("=========================================================\n");
+	printf("============ Event filter 2 consumers ===================\n");
+
+	object_list = wmi.list_event_filter_to_consumers();
+	if (object_list != NULL)
+	{
+		for (std::list<Object>::const_iterator iterator = object_list->begin(), end = object_list->end(); iterator != end; ++iterator) {
+
+			printf("=========================================================\n");
+
+			for (std::list<Entry>::const_iterator iterator2 = (*iterator).entry_list.begin(), end2 = (*iterator).entry_list.end(); iterator2 != end2; ++iterator2) {
+
+				wprintf(L" - %s (%s): %s\n", (*iterator2).name.c_str(), (*iterator2).type.c_str(), (*iterator2).value.c_str());
+			}
+		}
+
+		delete object_list;
+	}
+	else
+	{
+		printf("Failed to list event filter2consumers\n");
+	}
+
+	success = wmi.delete_persistence(filter_name, consumer_name);
+	if (success)
+	{
+		printf("Successfully deleted wmi persistence\n");
+	}
+	else
+	{
+		printf("Failed to delete wmi persistence: %d\n", GetLastError());
+	}
+
+	/*
+	success = wmi.delete_event_filter(filter_name);
+	if (success)
+	{
+		printf("Successfully deleted event filter\n");
+	}
+	else
+	{
+		printf("Failed to delete event filter: %d\n", GetLastError());
+	}
+
+	success = wmi.delete_event_consumer(consumer_name);
+	if (success)
+	{
+		printf("Successfully deleted event consumer\n");
+	}
+	else
+	{
+		printf("Failed to delete event consumer: %d\n", GetLastError());
+	}
+	*/
+}
+
 
 int main()
 {
+	//list_com();
+
+	//set_run_key_persistence();
+
 	/*
-	set_run_key_persistence();
-	
 	printf("\n==========================================\n\n");
 
 	set_service_persistence();
@@ -250,5 +465,9 @@ int main()
 
 	printf("\n==========================================\n\n");
 	*/
-	set_link_persistence();
+	//set_link_persistence();
+
+	printf("\n==========================================\n\n");
+
+	set_wmi_persistence();
 }

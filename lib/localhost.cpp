@@ -270,6 +270,9 @@ std::list<Process> Localhost::list_processes()
 	PROCESSENTRY32 pe32;
 	DWORD dwPriorityClass;
 
+	SYSTEM_INFO system_info;
+	GetNativeSystemInfo(&system_info);
+
 	// Take a snapshot of all processes in the system.
 	hProcessSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
 	if (hProcessSnap == INVALID_HANDLE_VALUE)
@@ -348,9 +351,47 @@ std::list<Process> Localhost::list_processes()
 
 		}
 
+		std::string image_type;
+		if (system_info.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64)
+		{
+			// Get process type
+			HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pe32.th32ProcessID);
+			if (hProcess != NULL)
+			{
+				BOOL ImageType;
+				BOOL success = IsWow64Process(hProcess, &ImageType);
+				if (success == TRUE)
+				{
+					if (ImageType == TRUE)
+					{
+						image_type = "x32";
+					}
+					else
+					{
+						image_type = "x64";
+					}
+				}
+				else
+				{
+					image_type = "unknown";
+				}
+			}
+			else
+			{
+				image_type = "unknown";
+			}
+		}
+		else if (system_info.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL)
+		{
+			image_type = "x32";
+		}
+		else
+		{
+			image_type = "unknown";
+		}
 
 
-		proc_list.push_back(Process(pe32.szExeFile, proc_path.c_str(), pe32.th32ProcessID, pe32.th32ParentProcessID));
+		proc_list.push_back(Process(pe32.szExeFile, proc_path.c_str(), pe32.th32ProcessID, pe32.th32ParentProcessID, image_type.c_str()));
 
 		/*
 		_tprintf(TEXT("\n\n====================================================="));
@@ -601,10 +642,11 @@ bool setUpWBEM(IWbemLocator*& wbemLocator, IWbemServices*& wbemServices) {
 	return true;
 }
 
-Process::Process(const char* exe_name, const char* exe_path, unsigned int pid, unsigned int parent_pid)
+Process::Process(const char* exe_name, const char* exe_path, unsigned int pid, unsigned int parent_pid, const char* image_type)
 {
 	this->exe_name = std::string(exe_name);
 	this->exe_path = std::string(exe_path);
 	this->pid = pid;
 	this->parent_pid = parent_pid;
+	this->image_type = std::string(image_type);
 }

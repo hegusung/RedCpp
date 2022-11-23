@@ -144,6 +144,7 @@
     <ClCompile Include="..\lib\registry.cpp" />
     <ClCompile Include="..\lib\services.cpp" />
     <ClCompile Include="..\lib\tasks.cpp" />
+    <ClCompile Include="..\lib\wmi.cpp" />
     <ClCompile Include="Persistence.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -151,6 +152,7 @@
     <ClInclude Include="..\lib\registry.h" />
     <ClInclude Include="..\lib\services.h" />
     <ClInclude Include="..\lib\tasks.h" />
+    <ClInclude Include="..\lib\wmi.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

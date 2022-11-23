@@ -539,8 +539,10 @@ DWORD WINAPI LoadRemoteLibraryR_QueueUserAPC(DWORD processId, HANDLE hProcess, L
 		Sleep(2 * 1000);
 		CloseHandle(hThread);
 
+		/*
 		if (success)
 			break;
+		*/
 
 	}
 

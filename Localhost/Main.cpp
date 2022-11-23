@@ -110,7 +110,7 @@ void listProcesses()
 	{
 		Process proc = *iterator;
 
-		printf(" - [%d -> %d] %s (%s)\n", proc.parent_pid, proc.pid, proc.exe_name.c_str(), proc.exe_path.c_str());
+		printf(" - [%d -> %d] %s (%s) (%s)\n", proc.parent_pid, proc.pid, proc.exe_name.c_str(), proc.exe_path.c_str(), proc.image_type.c_str());
 	}
 }
 
@@ -376,9 +376,9 @@ int main()
 	getSelfHash();
 
 	printf("\n==========================================\n\n");
-
+	*/
 	listProcesses();
-
+	/*
 	printf("\n==========================================\n\n");
 
 	test_keylogger();
@@ -391,7 +391,7 @@ int main()
 
 	*/
 
-	test_spawn();
+	//test_spawn();
 
 	Sleep(10 * 1000);
 }

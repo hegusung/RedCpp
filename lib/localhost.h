@@ -50,11 +50,12 @@ public:
 class Process
 {
 public:
-	Process(const char* exe_name, const char* exe_path, unsigned int pid, unsigned int parent_pid);
+	Process(const char* exe_name, const char* exe_path, unsigned int pid, unsigned int parent_pid, const char* image_type);
 	std::string exe_name;
 	std::string exe_path;
 	unsigned int pid;
 	unsigned int parent_pid;
+	std::string image_type;
 };
 
 class RDPServer
