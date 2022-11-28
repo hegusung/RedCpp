@@ -17,6 +17,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test_helloworld_exe", "test
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "reflective_dll", "dll\reflective_dll.vcxproj", "{3A371EBD-EEE1-4B2A-88B9-93E7BABE0949}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DumpLSASS", "DumpLSASS\DumpLSASS.vcxproj", "{BBD7055A-20DF-4D96-9D95-F3611942C30B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -81,6 +83,14 @@ Global
 		{3A371EBD-EEE1-4B2A-88B9-93E7BABE0949}.Release|x64.Build.0 = Release|x64
 		{3A371EBD-EEE1-4B2A-88B9-93E7BABE0949}.Release|x86.ActiveCfg = Release|Win32
 		{3A371EBD-EEE1-4B2A-88B9-93E7BABE0949}.Release|x86.Build.0 = Release|Win32
+		{BBD7055A-20DF-4D96-9D95-F3611942C30B}.Debug|x64.ActiveCfg = Debug|x64
+		{BBD7055A-20DF-4D96-9D95-F3611942C30B}.Debug|x64.Build.0 = Debug|x64
+		{BBD7055A-20DF-4D96-9D95-F3611942C30B}.Debug|x86.ActiveCfg = Debug|Win32
+		{BBD7055A-20DF-4D96-9D95-F3611942C30B}.Debug|x86.Build.0 = Debug|Win32
+		{BBD7055A-20DF-4D96-9D95-F3611942C30B}.Release|x64.ActiveCfg = Release|x64
+		{BBD7055A-20DF-4D96-9D95-F3611942C30B}.Release|x64.Build.0 = Release|x64
+		{BBD7055A-20DF-4D96-9D95-F3611942C30B}.Release|x86.ActiveCfg = Release|Win32
+		{BBD7055A-20DF-4D96-9D95-F3611942C30B}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -242,7 +242,7 @@ int Token::getTokenUser(char** username, char** domain)
 	*username = (char*)malloc(usernamesize);
 	*domain = (char*)malloc(domainsize);
 
-	success = LookupAccountSid(NULL, token_user->User.Sid, *username, &usernamesize, *domain, &domainsize, &sid_name_use);
+	success = LookupAccountSidA(NULL, token_user->User.Sid, *username, &usernamesize, *domain, &domainsize, &sid_name_use);
 	if(!success)
 	{
 		#ifdef DEBUG
@@ -345,7 +345,7 @@ int Token::enablePrivilege(const char* privilege_name)
 	TOKEN_PRIVILEGES tokenPriv;
 	LUID luidDebug;
 
-	if(LookupPrivilegeValue(NULL, privilege_name, &luidDebug) != FALSE)
+	if(LookupPrivilegeValueA(NULL, privilege_name, &luidDebug) != FALSE)
 	{
 		tokenPriv.PrivilegeCount           = 1;
 		tokenPriv.Privileges[0].Luid       = luidDebug;
@@ -395,7 +395,7 @@ int Token::createProcess(const wchar_t* application)
 Token* createToken(const char* domain, const char* username, const char* password)
 {
 	HANDLE hToken = NULL;
-	BOOL res = LogonUser(username, domain, password, LOGON32_LOGON_INTERACTIVE, LOGON32_PROVIDER_DEFAULT, &hToken);
+	BOOL res = LogonUserA(username, domain, password, LOGON32_LOGON_INTERACTIVE, LOGON32_PROVIDER_DEFAULT, &hToken);
 	if(!res)
 	{
 		#ifdef DEBUG
@@ -415,9 +415,9 @@ int Token::loadUserProfile()
 	printf("Token: %d\n", this->hToken);
 	#endif
 
-	PROFILEINFO profile_info;
-	memset(&profile_info, 0, sizeof(PROFILEINFO));
-	profile_info.dwSize = sizeof(PROFILEINFO);
+	PROFILEINFOA profile_info;
+	memset(&profile_info, 0, sizeof(PROFILEINFOA));
+	profile_info.dwSize = sizeof(PROFILEINFOA);
 
 	char* username;
 	char* domain;
@@ -427,7 +427,7 @@ int Token::loadUserProfile()
 	sprintf_s(dom_user, strlen(username) + strlen(domain) + 2, "%s\\%s", domain, username);
 	profile_info.lpUserName = dom_user;
 
-	BOOL b = LoadUserProfile(this->hToken, &profile_info);
+	BOOL b = LoadUserProfileA(this->hToken, &profile_info);
 
 	#ifdef DEBUG
 	printf("LoadUserProfile: %d: %d\n", b, GetLastError());
