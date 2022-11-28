@@ -15,10 +15,11 @@
 #include <comdef.h>
 //  Include the task header file.
 #include <taskschd.h>
+#include "com.h"
 
 
 #pragma comment(lib, "taskschd.lib")
-#pragma comment(lib, "comsupp.lib")
+//#pragma comment(lib, "comsupp.lib")
 
 
 class Task
@@ -49,6 +50,8 @@ public:
 	bool stop_service(const char* service_name);
 	bool delete_service(const char* service_name);
 	*/
+private:
+	COM com;
 };
 
 #endif

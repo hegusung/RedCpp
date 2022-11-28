@@ -7,21 +7,58 @@
 
 WMI::WMI()
 {
-	this->initializeCom();
+	//this->initializeCom();
+	IWbemLocator* wbemLocator = NULL;
+	IWbemServices* wbemServices = NULL;
+	authenticated = false;
+	std::wstring wmi_namespace = L"";
 }
 
 WMI::~WMI()
 {
-	CoUninitialize();
 }
 
-bool WMI::execute(const char* host, const char* username, const char* password, const char* command)
+bool WMI::authenticate(const wchar_t* wmi_namespace, const char* host, const char* username, const char* password)
 {
-	IWbemLocator* wbemLocator = NULL;
-	IWbemServices* wbemServices = NULL;
+	this->authenticated = this->setUpWBEM(wmi_namespace, host, username, password, &this->wbemLocator, &this->wbemServices);
+	if (this->authenticated)
+	{
+		this->wmi_namespace = std::wstring(wmi_namespace);
+	}
 
-	bool success = this->setUpWBEM(L"ROOT\\CIMV2", host, username, password, &wbemLocator, &wbemServices);
-	if (!success)
+	return this->authenticated;
+}
+
+bool WMI::authenticate_cimv2(const char* host, const char* username, const char* password)
+{
+	return this->authenticate(L"ROOT\\CIMV2", host, username, password);
+}
+
+bool WMI::authenticate_subscription(const char* host, const char* username, const char* password)
+{
+	return this->authenticate(L"ROOT\\SUBSCRIPTION", host, username, password);
+}
+
+void WMI::deauthenticate()
+{
+	this->authenticated = false;
+	this->wmi_namespace = L"";
+
+	if (wbemServices != NULL)
+		wbemServices->Release();
+	wbemServices = NULL;
+
+	if (wbemLocator != NULL)
+		wbemLocator->Release();
+	wbemLocator = NULL;
+}
+
+/*
+* Authenticate to ROOT\\CIMV2 first
+*/
+bool WMI::execute(const char* command)
+{
+	if (!this->authenticated || this->wmi_namespace.compare(L"ROOT\\CIMV2") != 0)
 		return false;
 
 	// Step 7: --------------------------------------------------
@@ -41,8 +78,6 @@ bool WMI::execute(const char* host, const char* username, const char* password, 
 
 		SysFreeString(ClassName);
 		SysFreeString(MethodName);
-		wbemServices->Release();
-		wbemLocator->Release();
 
 		return false;               // Program has failed.
 	}
@@ -58,8 +93,6 @@ bool WMI::execute(const char* host, const char* username, const char* password, 
 
 		SysFreeString(ClassName);
 		SysFreeString(MethodName);
-		wbemServices->Release();
-		wbemLocator->Release();
 		
 		return false;               // Program has failed.
 	}
@@ -96,8 +129,6 @@ bool WMI::execute(const char* host, const char* username, const char* password, 
 		pClassInstance->Release();
 		pInParamsDefinition->Release();
 		pOutParams->Release();
-		wbemServices->Release();
-		wbemLocator->Release();
 
 		return false;               // Program has failed.
 	}
@@ -116,12 +147,6 @@ bool WMI::execute(const char* host, const char* username, const char* password, 
 #ifdef DEBUG
 	printf("Successfully executed command through WMI\n");
 #endif
-
-	// Cleanup
-	// ========
-
-	wbemServices->Release();
-	wbemLocator->Release();
 
 	return true;
 }
@@ -164,21 +189,12 @@ bool WMI::initializeCom() {
 }
 
 bool WMI::setUpWBEM(const wchar_t* wmi_namespace, const char* host, const char* username, const char* password, IWbemLocator** wbemLocator, IWbemServices** wbemServices) {
-	// Step 3: ---------------------------------------------------
-	// Obtain the initial locator to WMI -------------------------
-	HRESULT hres = CoCreateInstance(
-		CLSID_WbemLocator,
-		0,
-		CLSCTX_INPROC_SERVER,
-		IID_IWbemLocator, (LPVOID*)wbemLocator);
 
-	if (FAILED(hres))
+	HRESULT hres;
+	bool success = com.CreateInstance(CLSID_WbemLocator, IID_IWbemLocator, (LPVOID*)wbemLocator, NULL, NULL, NULL, NULL);
+	if (!success)
 	{
-		std::cout << "Failed to create IWbemLocator object."
-			<< " Err code = 0x"
-			<< std::hex << hres << std::endl;
-		CoUninitialize();
-		return false;                 // Program has failed.
+		return false;
 	}
 
 	// Step 4: -----------------------------------------------------
@@ -216,10 +232,6 @@ bool WMI::setUpWBEM(const wchar_t* wmi_namespace, const char* host, const char* 
 			MultiByteToWideChar(CP_ACP, 0, username, -1, w_username, MAX_PATH);
 			MultiByteToWideChar(CP_ACP, 0, password, -1, w_password, MAX_PATH);
 
-			wprintf(L"Path: %s\n", w_namespace);
-			wprintf(L"User: %s\n", w_username);
-			wprintf(L"Pass: %s\n", w_password);
-
 			// Connect to the local root\cimv2 namespace
 			// and obtain pointer pSvc to make IWbemServices calls.
 			hres = (*wbemLocator)->ConnectServer(
@@ -233,7 +245,6 @@ bool WMI::setUpWBEM(const wchar_t* wmi_namespace, const char* host, const char* 
 				wbemServices
 			);
 
-			printf("HRES: %x\n", hres);
 		}
 		else
 		{
@@ -256,6 +267,7 @@ bool WMI::setUpWBEM(const wchar_t* wmi_namespace, const char* host, const char* 
 	{
 		std::cout << "Could not connect. Error code = 0x" << std::hex << hres << std::endl;
 		(*wbemLocator)->Release();
+		(*wbemLocator) = NULL;
 		CoUninitialize();
 		return false;                // Program has failed.
 	}
@@ -329,7 +341,9 @@ bool WMI::setUpWBEM(const wchar_t* wmi_namespace, const char* host, const char* 
 		std::cout << "Could not set proxy blanket. Error code = 0x"
 			<< std::hex << hres << std::endl;
 		(*wbemServices)->Release();
+		(*wbemServices) = NULL;
 		(*wbemLocator)->Release();
+		(*wbemLocator) = NULL;
 		CoUninitialize();
 		return false;               // Program has failed.
 	}
@@ -337,17 +351,16 @@ bool WMI::setUpWBEM(const wchar_t* wmi_namespace, const char* host, const char* 
 	return true;
 }
 
+/*
+* Authenticate to ROOT\\SUBSCRIPTION first
+*/
 bool WMI::persistence(const wchar_t* ef_class_name, const wchar_t* ec_class_name, const wchar_t* command)
 {
 	// Source: https://github.com/wumb0/sh3llparty/blob/master/wmicallback.cpp
 
 	bool success = false;
 
-	IWbemLocator* wbemLocator = NULL;
-	IWbemServices* wbemServices = NULL;
-
-	bool success_setUpWBEM = this->setUpWBEM(L"ROOT\\SUBSCRIPTION", NULL, NULL, NULL, &wbemLocator, &wbemServices);
-	if (!success_setUpWBEM)
+	if (!this->authenticated || this->wmi_namespace.compare(L"ROOT\\SUBSCRIPTION") != 0)
 		return false;
 
 	HRESULT hres;
@@ -515,36 +528,41 @@ rip:
 	if (timerinstruction)
 		timerinstruction->Release();
 
-	wbemServices->Release();
-	wbemLocator->Release();
-
 	return success;
 }
 
+/*
+* Authenticate to ROOT\\SUBSCRIPTION first
+*/
 std::list<Object>* WMI::list_event_filters()
 {
 	return this->list_class_objects(L"__EventFilter");
 }
 
+/*
+* Authenticate to ROOT\\SUBSCRIPTION first
+*/
 std::list<Object>* WMI::list_event_consumers()
 {
 	return this->list_class_objects(L"__EventConsumer");
 }
 
+/*
+* Authenticate to ROOT\\SUBSCRIPTION first
+*/
 std::list<Object>* WMI::list_event_filter_to_consumers()
 {
 	return this->list_class_objects(L"__FilterToConsumerBinding");
 }
 
+/*
+* Authenticate to ROOT\\SUBSCRIPTION first
+*/
 std::list<Object>* WMI::list_class_objects(const wchar_t* class_name)
 {
 	std::list<Object>* object_list = NULL;
 
-	IWbemLocator* wbemLocator = NULL;
-	IWbemServices* wbemServices = NULL;
-
-	bool success_setUpWBEM = this->setUpWBEM(L"ROOT\\SUBSCRIPTION", NULL, NULL, NULL, &wbemLocator, &wbemServices);
-	if (!success_setUpWBEM)
+	if (!this->authenticated || this->wmi_namespace.compare(L"ROOT\\SUBSCRIPTION") != 0)
 		return NULL;
 
 	HRESULT hres;
@@ -626,20 +644,112 @@ std::list<Object>* WMI::list_class_objects(const wchar_t* class_name)
 
 rip:
 
-	wbemServices->Release();
-	wbemLocator->Release();
-
 	return object_list;
 }
 
+/*
+* Authenticate to a namespace first first
+*/
+std::list<Object>* WMI::wql_query(const wchar_t* query)
+{
+	std::list<Object>* object_list = NULL;
+
+	if (!this->authenticated)
+		return NULL;
+
+	HRESULT hres;
+	BSTR bstr_wql = SysAllocString(L"WQL");
+	BSTR bstr_sql = SysAllocString(query);
+
+	IEnumWbemClassObject* pEnumerator{ nullptr };
+	hres = this->wbemServices->ExecQuery(
+		bstr_wql,
+		bstr_sql,
+		WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY,
+		nullptr,
+		&pEnumerator);
+
+	if (FAILED(hres))
+	{
+		return NULL;               // Program has failed.
+	}
+
+	object_list = new std::list<Object>();
+
+	IWbemClassObject* pclsObj{ nullptr };
+	ULONG uReturn = 0;
+
+	while (true)
+	{
+		HRESULT hr = pEnumerator->Next(WBEM_INFINITE, 1, &pclsObj, &uReturn);
+
+		if (0 == uReturn)
+		{
+			break;
+		}
+
+		Object object;
+		pclsObj->BeginEnumeration(NULL);
+
+		BSTR bName; // used to get name of attribute
+		VARIANT val; // WMI attribute
+		CIMTYPE type; // WMI attribute type
+
+		while (pclsObj->Next(0, &bName, &val, &type, NULL) != WBEM_S_NO_MORE_DATA)
+		{
+			if (val.vt == VT_NULL) // VT_NULL
+			{
+				object.add(Entry((wchar_t*)bName, L"VT_NULL", L"(null)"));
+			}
+			else if (val.vt == VT_I2) // VT_I2
+			{
+				object.add(Entry((wchar_t*)bName, L"VT_I2", std::to_wstring(val.intVal)));
+			}
+			else if (val.vt == VT_I4) // VT_I4
+			{
+				object.add(Entry((wchar_t*)bName, L"VT_I4", std::to_wstring(val.intVal)));
+			}
+			else if (val.vt == VT_BOOL) // VT_BOOL 
+			{
+				object.add(Entry((wchar_t*)bName, L"VT_BOOL", std::to_wstring(val.intVal)));
+			}
+			else if (val.vt == VT_UI4) // VT_UI4 
+			{
+				object.add(Entry((wchar_t*)bName, L"VT_UI4", std::to_wstring(val.uintVal)));
+			}
+			else if (val.vt == VT_BSTR) // VT_BSTR  
+			{
+				object.add(Entry((wchar_t*)bName, L"VT_BSTR", (wchar_t*)val.bstrVal));
+			}
+			else
+			{
+				object.add(Entry((wchar_t*)bName, std::to_wstring(val.vt).c_str(), L"Unknown"));
+			}
+
+			VariantClear(&val);
+			SysFreeString(bName);
+		}
+
+		pclsObj->EndEnumeration();
+
+		pclsObj->Release();
+
+		object_list->push_back(object);
+
+		
+	}
+
+rip:
+	return object_list;
+}
+
+/*
+* Authenticate to ROOT\\SUBSCRIPTION first
+*/
 bool WMI::delete_object(const wchar_t* class_name, const wchar_t* instance_name)
 {
-	IWbemLocator* wbemLocator = NULL;
-	IWbemServices* wbemServices = NULL;
-
-	bool success_setUpWBEM = this->setUpWBEM(L"ROOT\\SUBSCRIPTION", NULL, NULL, NULL, &wbemLocator, &wbemServices);
-	if (!success_setUpWBEM)
-		return NULL;
+	if (!this->authenticated || this->wmi_namespace.compare(L"ROOT\\SUBSCRIPTION") != 0)
+		return false;
 
 	std::wstring query = std::wstring(class_name) + L".Name=\"" + instance_name + L"\"";
 
@@ -664,14 +774,13 @@ bool WMI::delete_object(const wchar_t* class_name, const wchar_t* instance_name)
 	}
 }
 
+/*
+* Authenticate to ROOT\\SUBSCRIPTION first
+*/
 bool WMI::delete_persistence(const wchar_t* ef_class_name, const wchar_t* ec_class_name)
 {
-	IWbemLocator* wbemLocator = NULL;
-	IWbemServices* wbemServices = NULL;
-
-	bool success_setUpWBEM = this->setUpWBEM(L"ROOT\\SUBSCRIPTION", NULL, NULL, NULL, &wbemLocator, &wbemServices);
-	if (!success_setUpWBEM)
-		return NULL;
+	if (!this->authenticated || this->wmi_namespace.compare(L"ROOT\\SUBSCRIPTION") != 0)
+		return false;
 
 	bool failed = false;
 	HRESULT hres;

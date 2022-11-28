@@ -129,10 +129,10 @@ void list_com()
 	Registry reg = Registry();
 
 	printf("COM objects:\n");
-	std::list<COM>* com_list = reg.list_com();
+	std::list<COM_object>* com_list = reg.list_com();
 	if (com_list != NULL)
 	{
-		for (std::list<COM>::const_iterator iterator = com_list->begin(), end = com_list->end(); iterator != end; ++iterator) {
+		for (std::list<COM_object>::const_iterator iterator = com_list->begin(), end = com_list->end(); iterator != end; ++iterator) {
 
 			printf(" - %s: %s\n", (*iterator).clsid.c_str(), (*iterator).name.c_str());
 		}
@@ -212,9 +212,10 @@ void set_service_persistence()
 
 void set_task_persistence()
 {
+	bool success;
 	Tasks tasks = Tasks();
 
-	bool success = tasks.create_task(L"\\", L"Test task", L"C:\\Windows\\System32\\calc.exe");
+	success = tasks.create_task(L"\\", L"Test task", L"C:\\Windows\\System32\\calc.exe");
 	if (success)
 	{
 		printf("Successfully created task\n");
@@ -332,6 +333,8 @@ void set_wmi_persistence()
 	WMI wmi;
 	bool success;
 
+	wmi.authenticate_subscription(NULL, NULL, NULL);
+
 	const wchar_t* filter_name = L"filter1";
 	const wchar_t* consumer_name = L"consumer1";
 
@@ -424,29 +427,46 @@ void set_wmi_persistence()
 		printf("Failed to delete wmi persistence: %d\n", GetLastError());
 	}
 
-	/*
-	success = wmi.delete_event_filter(filter_name);
-	if (success)
-	{
-		printf("Successfully deleted event filter\n");
-	}
-	else
-	{
-		printf("Failed to delete event filter: %d\n", GetLastError());
-	}
 
-	success = wmi.delete_event_consumer(consumer_name);
-	if (success)
-	{
-		printf("Successfully deleted event consumer\n");
-	}
-	else
-	{
-		printf("Failed to delete event consumer: %d\n", GetLastError());
-	}
-	*/
+	wmi.deauthenticate();
+
+	printf("Sucessfully deauthenticated\n");
 }
 
+void test_wmi_query()
+{
+	WMI wmi;
+	bool success;
+
+	wmi.authenticate_cimv2(NULL, NULL, NULL);
+
+	printf("=========================================================\n");
+	printf("=========================== WQL Query ===================\n");
+
+	std::list<Object>* object_list = wmi.wql_query(L"SELECT * FROM Win32_AccountSID");
+	if (object_list != NULL)
+	{
+		for (std::list<Object>::const_iterator iterator = object_list->begin(), end = object_list->end(); iterator != end; ++iterator) {
+
+			printf("=========================================================\n");
+
+			for (std::list<Entry>::const_iterator iterator2 = (*iterator).entry_list.begin(), end2 = (*iterator).entry_list.end(); iterator2 != end2; ++iterator2) {
+
+				wprintf(L" - %s (%s): %s\n", (*iterator2).name.c_str(), (*iterator2).type.c_str(), (*iterator2).value.c_str());
+			}
+		}
+
+		delete object_list;
+	}
+	else
+	{
+		printf("Failed to list event filter2consumers\n");
+	}
+
+	wmi.deauthenticate();
+
+	printf("Sucessfully deauthenticated\n");
+}
 
 int main()
 {
@@ -454,20 +474,21 @@ int main()
 
 	//set_run_key_persistence();
 
-	/*
 	printf("\n==========================================\n\n");
 
-	set_service_persistence();
+	//set_service_persistence();
 
 	printf("\n==========================================\n\n");
 
-	set_task_persistence();
+	//set_task_persistence();
 
 	printf("\n==========================================\n\n");
-	*/
+	
 	//set_link_persistence();
 
 	printf("\n==========================================\n\n");
 
-	set_wmi_persistence();
+	//set_wmi_persistence();
+
+	test_wmi_query();
 }

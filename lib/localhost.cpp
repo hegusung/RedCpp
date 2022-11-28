@@ -505,6 +505,122 @@ std::list<RDPServer> Localhost::list_rdp_servers()
 	return rdp_list;
 }
 
+std::list<std::string> windows_list;
+
+static BOOL CALLBACK enumWindowCallback(HWND hWnd, LPARAM lparam) {
+	int length = GetWindowTextLength(hWnd);
+	char* buffer = new char[length + 1];
+	GetWindowText(hWnd, buffer, length + 1);
+	std::string windowTitle(buffer);
+	delete[] buffer;
+
+	// List visible windows with a non-empty title
+	if (IsWindowVisible(hWnd) && length != 0) {
+		windows_list.push_back(windowTitle);
+	}
+	return TRUE;
+}
+
+std::list<std::string> Localhost::list_windows()
+{
+	windows_list.clear();
+
+	EnumWindows(enumWindowCallback, NULL);
+
+	return windows_list;
+}
+
+std::list<MountPoint> Localhost::list_mounts()
+{
+	std::list<MountPoint> mountpoint_list;
+
+	PSHARE_INFO_502 BufPtr, pth;
+	//PSHARE_INFO_2 BufPtr, pth;
+	NET_API_STATUS  res;
+	DWORD er = 0, tr = 0, resume = 0, I;
+
+	// Call the NetShareEnum() function; specify level 502.
+	do // begin do
+	{
+		res = NetShareEnum(NULL, 502, (LPBYTE*)&BufPtr, -1, &er, &tr, &resume);
+
+		// If the call succeeds,
+		if (res == ERROR_SUCCESS || res == ERROR_MORE_DATA)
+		{
+			pth = BufPtr;
+			// Loop through the entries, print the retrieved data.
+			for (unsigned int i = 1; i <= er; i++)
+			{
+				MountPoint share_info = MountPoint(pth->shi502_netname, pth->shi502_path);
+
+				mountpoint_list.push_back(share_info);
+
+				pth++;
+			}
+
+			// Free the allocated buffer.
+			NetApiBufferFree(BufPtr);
+		}
+	} while (res == ERROR_MORE_DATA); // end do
+
+	return mountpoint_list;
+}
+
+std::list<VaultEntry> Localhost::list_vault()
+{
+	std::list<VaultEntry> vault_list;
+
+	DWORD Count;
+	PCREDENTIALW* Credential;
+	//Now enumerate all http stored credentials....
+	if (CredEnumerateW(NULL, CRED_ENUMERATE_ALL_CREDENTIALS, &Count, &Credential))
+	{
+
+		for (int i = 0; i < Count; i++)
+		{
+			std::wstring username;
+			if (Credential[i]->UserName != NULL)
+				username = std::wstring(Credential[i]->UserName);
+			else
+				username = L"";
+			std::wstring target;
+			if (Credential[i]->TargetName != NULL)
+				target = std::wstring(Credential[i]->TargetName);
+			else
+				target = L"";
+			std::wstring comment;
+			if (Credential[i]->Comment != NULL)
+				comment = std::wstring(Credential[i]->Comment);
+			else
+				comment = L"";
+			std::wstring password;
+			if (Credential[i]->CredentialBlobSize != 0)
+				password = std::wstring((wchar_t*)Credential[i]->CredentialBlob, Credential[i]->CredentialBlobSize / sizeof(wchar_t));
+			else
+				password = L"";
+
+			vault_list.push_back(VaultEntry(target, username, comment, password));
+		}
+		CredFree(Credential);
+	}
+
+	return vault_list;
+}
+
+VaultEntry::VaultEntry(std::wstring target, std::wstring username, std::wstring comment, std::wstring password)
+{
+	this->target = target;
+	this->username = username;
+	this->comment = comment;
+	this->password = password;
+}
+
+MountPoint::MountPoint(std::wstring name, std::wstring path)
+{
+	this->name = name;
+	this->path = path;
+}
+
 SystemInfo::SystemInfo(std::wstring os_name, std::wstring os_arch, std::wstring install_date, std::wstring last_boot_date)
 {
 	this->os_name = os_name;

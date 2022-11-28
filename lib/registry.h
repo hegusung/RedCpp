@@ -28,10 +28,10 @@ public:
 	std::string value;
 };
 
-class COM
+class COM_object
 {
 public:
-	COM(const char* name, const char* clsid);
+	COM_object(const char* name, const char* clsid);
 	std::string name;
 	std::string clsid;
 };
@@ -49,7 +49,7 @@ public:
 	bool set_entry_multi_sz(const char* reg_path, const char* name, const char* value);
 	bool remove_entry(const char* reg_path, const char* name);
 	bool delete_key(const char* reg_path);
-	std::list<COM>* list_com();
+	std::list<COM_object>* list_com();
 private:
 
 };

@@ -7,6 +7,8 @@
 **.vcxproj.FileListAbsolute.txt
 **.idb
 **.png
+**.tlog
+**unsuccessfulbuild
 
 # User-specific files
 *.suo

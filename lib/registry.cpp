@@ -555,14 +555,14 @@ bool Registry::delete_key(const char* reg_path)
 
 }
 
-std::list<COM>* Registry::list_com()
+std::list<COM_object>* Registry::list_com()
 {
-    std::list<COM>* com_list = NULL;
+    std::list<COM_object>* com_list = NULL;
 
     std::list<std::string>* subkeys = this->list_registry_subkeys("HKEY_LOCAL_MACHINE\\Software\\Classes");
     if (subkeys != NULL)
     {
-        com_list = new std::list<COM>();
+        com_list = new std::list<COM_object>();
 
         for (std::list<std::string>::const_iterator iterator = subkeys->begin(), end = subkeys->end(); iterator != end; ++iterator) {
 
@@ -602,7 +602,7 @@ std::list<COM>* Registry::list_com()
                     continue;
                 }
 
-                com_list->push_back(COM((*iterator).c_str(), clsid));
+                com_list->push_back(COM_object((*iterator).c_str(), clsid));
             }
         }
     }
@@ -619,7 +619,7 @@ RegEntry::RegEntry(const char* name, const char* type, std::string value)
     this->value = value;
 }
 
-COM::COM(const char* name, const char* clsid)
+COM_object::COM_object(const char* name, const char* clsid)
 {
     this->name = std::string(name);
     this->clsid = std::string(clsid);

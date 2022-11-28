@@ -16,6 +16,7 @@
 #include <strsafe.h>
 #include <KnownFolders.h>
 #include <ShlObj_core.h>
+#include "com.h"
 
 class Link
 {
@@ -41,6 +42,8 @@ public:
 	bool create_link(const char* service_name, const char* display_name, const char* exe_path, DWORD start_mode);
 	bool delete_link(const char* service_name);
 	*/
+private:
+	COM com;
 };
 
 bool ends_with(std::wstring const& value, std::wstring const& ending);

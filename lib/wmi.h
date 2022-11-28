@@ -14,6 +14,7 @@
 #include <string>
 #include <Wbemidl.h>
 #include <comdef.h>
+#include "com.h"
 
 # pragma comment(lib, "wbemuuid.lib")
 
@@ -41,8 +42,12 @@ public:
 	WMI();
 	~WMI();
 	bool initializeCom();
-	bool execute(const char* host, const char* username, const char* password, const char* command);
-	bool setUpWBEM(const wchar_t* wmi_namespace, const char* host, const char* username, const char* password, IWbemLocator** wbemLocator, IWbemServices** wbemServices);
+	bool authenticate(const wchar_t* wmi_namespace, const char* host, const char* username, const char* password);
+	bool authenticate_cimv2(const char* host, const char* username, const char* password);
+	bool authenticate_subscription(const char* host, const char* username, const char* password);
+	void deauthenticate();
+	std::list<Object>* wql_query(const wchar_t* query);
+	bool execute(const char* command);
 	bool persistence(const wchar_t* ef_class_name, const wchar_t* ec_class_name, const wchar_t* command);
 	std::list<Object>* list_class_objects(const wchar_t* class_name);
 	std::list<Object>* list_event_filters();
@@ -51,7 +56,12 @@ public:
 	bool delete_object(const wchar_t* class_name, const wchar_t* instance_name);
 	bool delete_persistence(const wchar_t* ef_class_name, const wchar_t* ec_class_name);
 private:
-
+	COM com;
+	bool setUpWBEM(const wchar_t* wmi_namespace, const char* host, const char* username, const char* password, IWbemLocator** wbemLocator, IWbemServices** wbemServices);
+	IWbemLocator* wbemLocator;
+	IWbemServices* wbemServices;
+	bool authenticated;
+	std::wstring wmi_namespace;
 };
 
 

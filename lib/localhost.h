@@ -20,8 +20,12 @@
 #include <Wbemidl.h>
 #include <comdef.h>
 #include <tlhelp32.h>
+#include <lm.h>
+#include <wincred.h>
 
-# pragma comment(lib, "wbemuuid.lib")
+#pragma comment(lib, "wbemuuid.lib")
+#pragma comment(lib, "Netapi32.lib")
+#pragma comment(lib, "Advapi32.lib")
 
 typedef std::vector<char> vectByte;
 
@@ -66,6 +70,24 @@ public:
 	std::string server;
 };
 
+class MountPoint
+{
+public:
+	MountPoint(std::wstring name, std::wstring path);
+	std::wstring name;
+	std::wstring path;
+};
+
+class VaultEntry
+{
+public:
+	VaultEntry(std::wstring target, std::wstring username, std::wstring comment, std::wstring password);
+	std::wstring target;
+	std::wstring username;
+	std::wstring comment;
+	std::wstring password;
+};
+
 class Localhost
 {
 public:
@@ -75,6 +97,9 @@ public:
 	std::list<Process> list_processes();
 	std::list<Application> list_applications();
 	std::list<RDPServer> list_rdp_servers();
+	std::list<std::string> list_windows();
+	std::list<MountPoint> list_mounts();
+	std::list<VaultEntry> list_vault();
 	// registry
 	std::list<std::string>* listSubKeys(const char* reg_path);
 	std::string getStringRegKey(HKEY hKey, const char* valueName);

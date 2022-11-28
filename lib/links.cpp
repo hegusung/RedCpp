@@ -59,6 +59,65 @@ void Links::get_link_info(std::string path, std::list<Link>* link_list)
     WCHAR szDescription[MAX_PATH];
     WIN32_FIND_DATAW wfd;
 
+    bool success = com.CreateInstance(CLSID_ShellLink, IID_IShellLink, (LPVOID*)&psl, NULL, NULL, NULL, NULL);
+    if (!success)
+        return;
+
+    IPersistFile* ppf;
+    // Get a pointer to the IPersistFile interface. 
+    hres = psl->QueryInterface(IID_IPersistFile, (void**)&ppf);
+
+    if (SUCCEEDED(hres))
+    {
+        WCHAR wsz[MAX_PATH];
+
+        // Ensure that the string is Unicode. 
+        MultiByteToWideChar(CP_ACP, 0, path.c_str(), -1, wsz, MAX_PATH);
+
+        // Add code here to check return value from MultiByteWideChar 
+        // for success.
+
+        // Load the shortcut. 
+        hres = ppf->Load(wsz, STGM_READ);
+
+        if (SUCCEEDED(hres))
+        {
+            std::string lnk_path = "";
+            std::string lnk_args = "";
+            std::string lnk_description = "";
+
+            // Get the path to the link target. 
+            hres = psl->GetPath(szGotPath, MAX_PATH, &wfd, SLGP_RAWPATH);
+            if (SUCCEEDED(hres))
+            {
+                lnk_path = std::string((char*)szGotPath);
+            }
+
+            // Get the description of the target. 
+            hres = psl->GetDescription(szDescription, MAX_PATH);
+            if (SUCCEEDED(hres))
+            {
+                lnk_description = std::string((char*)szDescription);
+            }
+
+            // Get the path to the link target. 
+            hres = psl->GetArguments(szGotPath, MAX_PATH);
+            if (SUCCEEDED(hres))
+            {
+                lnk_args = std::string((char*)szGotPath);
+            }
+
+            link_list->push_back(Link(path.c_str(), lnk_description.c_str(), lnk_path.c_str(), lnk_args.c_str()));
+        }
+
+        // Release the pointer to the IPersistFile interface. 
+        ppf->Release();
+    }
+
+    // Release the pointer to the IShellLink interface. 
+    psl->Release();
+
+    /*
     //  ------------------------------------------------------
  //  Initialize COM.
     HRESULT hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
@@ -130,6 +189,7 @@ void Links::get_link_info(std::string path, std::list<Link>* link_list)
         // Release the pointer to the IShellLink interface. 
         psl->Release();
     }
+    */
 }
 
 bool Links::create_startup_folder_link(const char* lnk_name, const char* lnk_description, const char* lnk_target, const char* lnk_args)
@@ -140,6 +200,45 @@ bool Links::create_startup_folder_link(const char* lnk_name, const char* lnk_des
 
     if (SUCCEEDED(hres))
     {
+        IShellLink* psl;
+        bool success_createinstance = com.CreateInstance(CLSID_ShellLink, IID_IShellLink, (LPVOID*)&psl, NULL, NULL, NULL, NULL);
+        if (!success_createinstance)
+            return false;
+
+        IPersistFile* ppf;
+
+        // Set the path to the shortcut target and add the description. 
+        psl->SetPath(lnk_target);
+        psl->SetArguments(lnk_args);
+        psl->SetDescription(lnk_description);
+
+        // Query IShellLink for the IPersistFile interface, used for saving the 
+        // shortcut in persistent storage. 
+        hres = psl->QueryInterface(IID_IPersistFile, (LPVOID*)&ppf);
+
+        if (SUCCEEDED(hres))
+        {
+            WCHAR wsz[MAX_PATH];
+
+            // Ensure that the string is Unicode. 
+            MultiByteToWideChar(CP_ACP, 0, lnk_name, -1, wsz, MAX_PATH);
+
+            std::wstring lnk_path = std::wstring(pszPath) + L"\\" + std::wstring(wsz);
+            if (!ends_with(lnk_path, L".lnk"))
+                lnk_path += L".lnk";
+
+            // Add code here to check return value from MultiByteWideChar 
+            // for success.
+
+            // Save the link by calling IPersistFile::Save. 
+            hres = ppf->Save(lnk_path.c_str(), TRUE);
+            ppf->Release();
+
+            success = true;
+        }
+        psl->Release();
+
+        /*
         //  ------------------------------------------------------
  //  Initialize COM.
         HRESULT hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
@@ -191,6 +290,7 @@ bool Links::create_startup_folder_link(const char* lnk_name, const char* lnk_des
             }
             psl->Release();
         }
+        */
     }
     else
     {
