@@ -116,7 +116,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>Win64;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
@@ -143,12 +143,14 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\lib\bypass_av.cpp" />
+    <ClCompile Include="..\lib\MemoryModule.c" />
     <ClCompile Include="..\lib\token.cpp" />
     <ClCompile Include="..\syswhisper\syscalls_jumper_randomized.c" />
     <ClCompile Include="DumpLSASS.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\lib\bypass_av.h" />
+    <ClInclude Include="..\lib\MemoryModule.h" />
     <ClInclude Include="..\lib\token.h" />
     <ClInclude Include="..\lib\win_nt.h" />
     <ClInclude Include="..\syswhisper\syscalls_jumper_randomized.h" />

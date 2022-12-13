@@ -14,6 +14,7 @@ typedef struct _UNICODE_STRING
     PWSTR Buffer;
 } DUNICODE_STRING, * PDUNICODE_STRING;
 
+/*
 FORCEINLINE VOID RtlInitUnicodeString(
     _Out_ PDUNICODE_STRING DestinationString,
     _In_opt_ PWSTR SourceString
@@ -26,6 +27,7 @@ FORCEINLINE VOID RtlInitUnicodeString(
 
     DestinationString->Buffer = SourceString;
 }
+*/
 
 typedef _Success_(return >= 0) LONG NTSTATUS;
 typedef NTSTATUS* PNTSTATUS;
@@ -54,7 +56,7 @@ typedef struct _OBJECT_ATTRIBUTES
     ULONG Attributes;
     PVOID SecurityDescriptor; // PSECURITY_DESCRIPTOR;
     PVOID SecurityQualityOfService; // PSECURITY_QUALITY_OF_SERVICE
-} DOBJECT_ATTRIBUTES, * PDOBJECT_ATTRIBUTES;
+} OBJECT_ATTRIBUTES, * POBJECT_ATTRIBUTES;
 
 #define NT_SUCCESS(Status) (((NTSTATUS)(Status)) >= 0)
 
@@ -62,7 +64,7 @@ typedef struct _OBJECT_ATTRIBUTES
 typedef NTSTATUS(*_NtCreateFile)(
     _In_          PHANDLE            FileHandle,
     _In_           ACCESS_MASK        DesiredAccess,
-    _In_           PDOBJECT_ATTRIBUTES ObjectAttributes,
+    _In_           POBJECT_ATTRIBUTES ObjectAttributes,
     _Out_          PIO_STATUS_BLOCK   IoStatusBlock,
     _In_opt_       PLARGE_INTEGER     AllocationSize,
     _In_           ULONG              FileAttributes,
@@ -87,6 +89,14 @@ typedef NTSTATUS(*_NtReadFile)(
 
 typedef NTSTATUS(*_NtClose)(
     _In_ HANDLE Handle
+    );
+
+typedef NTSTATUS(*_NtProtectVirtualMemory)(
+    IN HANDLE,
+    IN OUT PVOID*,
+    IN OUT PSIZE_T,
+    IN DWORD,
+    OUT PDWORD
     );
 
 #endif

