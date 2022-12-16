@@ -83,9 +83,45 @@ std::string Localhost::getStringRegKey(HKEY hKey, const char* valueName)
     return std::string("");
 }
 
-vectByte Localhost::screenshot()
+int GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
+{
+	UINT  num = 0;          // number of image encoders
+	UINT  size = 0;         // size of the image encoder array in bytes
+
+	Gdiplus::ImageCodecInfo* pImageCodecInfo = NULL;
+
+	Gdiplus::GetImageEncodersSize(&num, &size);
+	if (size == 0)
+		return -1;  // Failure
+
+	pImageCodecInfo = (Gdiplus::ImageCodecInfo*)(malloc(size));
+	if (pImageCodecInfo == NULL)
+		return -2;  // Failure
+
+	GetImageEncoders(num, size, pImageCodecInfo);
+
+	for (UINT j = 0; j < num; ++j)
+	{
+		if (wcscmp(pImageCodecInfo[j].MimeType, format) == 0)
+		{
+			*pClsid = pImageCodecInfo[j].Clsid;
+			free(pImageCodecInfo);
+			return j;  // Success
+		}
+	}
+
+	free(pImageCodecInfo);
+	return -3;  // Failure
+}
+
+char* Localhost::screenshot(int* size)
 {
 	// Source: https://stackoverflow.com/a/28248531
+	CoInitialize(NULL);
+
+	*size = 0;
+	char* data = NULL;
+	Gdiplus::Bitmap* bmp = NULL;
 
     // Screen width and height
 	int x_start = GetSystemMetrics(SM_XVIRTUALSCREEN);
@@ -100,19 +136,55 @@ vectByte Localhost::screenshot()
     HGDIOBJ old_obj = SelectObject(hDC, hBitmap);
     BOOL    bRet    = BitBlt(hDC, 0, 0, width, height, hScreen, x_start, y_start, SRCCOPY);
 
-	// Save bitmap to mem as png
-	CImage image;
-	image.Attach(hBitmap);
-	vectByte png_buffer;
-	image_to_buffer_png(image, png_buffer);
+	// Initialize GDI+.
+	Gdiplus::GdiplusStartupInput gdipStartupInput;
+	ULONG_PTR gdipToken;
+	Gdiplus::GdiplusStartup(&gdipToken, &gdipStartupInput, NULL);
 
-	 // clean up
-    SelectObject(hDC, old_obj);
-    DeleteDC(hDC);
-    ReleaseDC(NULL, hScreen);
-    DeleteObject(hBitmap);
+	IStream* stream = NULL;
+	if (CreateStreamOnHGlobal(NULL, TRUE, &stream) != 0)
+	{
+		printf("fail\n");
+		return NULL;
+	}
 
-	return png_buffer;
+	bmp = Gdiplus::Bitmap::FromHBITMAP(hBitmap, (HPALETTE)0);
+	CLSID pngClsid;
+	GetEncoderClsid(L"image/png", &pngClsid);
+
+	Gdiplus::Status res = bmp->Save(stream, &pngClsid);
+	if (res != 0)
+	{
+		return NULL;
+	}
+
+	ULARGE_INTEGER liSize;
+	IStream_Size(stream, &liSize);
+
+	DWORD len = liSize.LowPart;
+	IStream_Reset(stream);
+	data = (char*)malloc(len);
+	*size = len;
+	IStream_Read(stream, data, len);
+
+	if (stream != NULL)
+		stream->Release();
+
+	if (bmp != NULL)
+		delete bmp;
+
+	// Close Gdiplus
+	Gdiplus::GdiplusShutdown(gdipToken);
+
+	// clean up
+	SelectObject(hDC, old_obj);
+	DeleteDC(hDC);
+	ReleaseDC(NULL, hScreen);
+	DeleteObject(hBitmap);
+
+	CoUninitialize();
+
+	return data;
 }
 
 void image_to_buffer_png(const CImage &image,  vectByte &png_buffer)

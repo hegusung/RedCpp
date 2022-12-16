@@ -48,7 +48,10 @@ public:
 	void deauthenticate();
 	std::list<Object>* wql_query(const wchar_t* query);
 	bool execute(const char* command);
-	bool persistence(const wchar_t* ef_class_name, const wchar_t* ec_class_name, const wchar_t* command);
+	bool persistence(const wchar_t* ef_class_name, const wchar_t* ec_class_name, const wchar_t* command, const wchar_t* query);
+	bool persistence_startup(const wchar_t* ef_class_name, const wchar_t* ec_class_name, const wchar_t* command);
+	bool persistence_userlogon(const wchar_t* ef_class_name, const wchar_t* ec_class_name, const wchar_t* command);
+	bool persistence_onexecution(const wchar_t* ef_class_name, const wchar_t* ec_class_name, const wchar_t* command, const wchar_t* binary);
 	std::list<Object>* list_class_objects(const wchar_t* class_name);
 	std::list<Object>* list_event_filters();
 	std::list<Object>* list_event_consumers();

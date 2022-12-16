@@ -215,7 +215,8 @@ void set_task_persistence()
 	bool success;
 	Tasks tasks = Tasks();
 
-	success = tasks.create_task(L"\\", L"Test task", L"C:\\Windows\\System32\\calc.exe");
+	//success = tasks.create_task_boot(L"\\", L"Test task", L"C:\\Windows\\System32\\calc.exe");
+	success = tasks.create_task_logon(L"\\", L"Test task", L"C:\\Windows\\System32\\calc.exe", "guillaume");
 	if (success)
 	{
 		printf("Successfully created task\n");
@@ -225,6 +226,7 @@ void set_task_persistence()
 		printf("Failed to create task\n");
 	}
 
+	/*
 	printf("Tasks:\n");
 	std::list<Task>* task_list = tasks.list_tasks();
 	if (task_list != NULL)
@@ -243,6 +245,7 @@ void set_task_persistence()
 	{
 		printf("Failed to list services\n");
 	}
+	*/
 
 	success = tasks.start_task(L"\\", L"Test task");
 	if (success)
@@ -338,7 +341,9 @@ void set_wmi_persistence()
 	const wchar_t* filter_name = L"filter1";
 	const wchar_t* consumer_name = L"consumer1";
 
-	success = wmi.persistence(filter_name, consumer_name, L"C:\\test.exe");
+	//success = wmi.persistence_startup(filter_name, consumer_name, L"C:\\test.exe");
+	//success = wmi.persistence_userlogon(filter_name, consumer_name, L"C:\\test.exe");
+	success = wmi.persistence_onexecution(filter_name, consumer_name, L"C:\\test.exe", L"chrome.exe");
 	if (success)
 	{
 		printf("Successfully set up wmi persistence\n");
@@ -488,7 +493,7 @@ int main()
 
 	printf("\n==========================================\n\n");
 
-	//set_wmi_persistence();
+	set_wmi_persistence();
 
-	test_wmi_query();
+	//test_wmi_query();
 }

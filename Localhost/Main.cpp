@@ -77,14 +77,21 @@ void screenshot(const char* path)
 {
 	Localhost host = Localhost();
 
-	vectByte screenshot = host.screenshot();
+	int size;
+	char* screenshot = host.screenshot(&size);
 
+	if (screenshot != NULL)
+	{
+		printf("Screenshot taken\n");
 #pragma warning(suppress : 4996)
-	FILE* f = fopen(path, "wb");
+		FILE* f = fopen(path, "wb");
 
-	fwrite((unsigned char*)&screenshot[0], 1, screenshot.size(), f);
+		fwrite(screenshot, 1, size, f);
 
-	fclose(f);
+		fclose(f);
+	}
+	else
+		printf("Fail to take screenshot\n");
 }
 
 void getSelfHash()
@@ -386,11 +393,11 @@ int main()
 {
 	
 	getSystemInfo();
-	/*
+	
 	printf("\n==========================================\n\n");
 
 	screenshot("screenshot.png");
-
+	/*
 	printf("\n==========================================\n\n");
 
 	getSelfHash();

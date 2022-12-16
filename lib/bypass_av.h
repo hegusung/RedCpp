@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <Windows.h>
 #include <psapi.h>
+#include <map>
 #include "MemoryModule.h"
 
 #if defined(METHOD_NTDLL)
@@ -126,8 +127,11 @@ public:
     BOOL disable_etw();
 
     // Memory module, load dll from memory
-    bool load_dll(const char* dll_name, const char* dll_data);
+    bool load_dll(const char* dll_name, const char* dll_data, size_t dll_size);
+    bool dll_exists(const char* dll_name);
     void* get_func(const char* dll_name, const char* func_name);
+private:
+    std::map<std::string, HMEMORYMODULE> module_map;
 };
 
 #endif

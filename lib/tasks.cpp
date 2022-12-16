@@ -259,7 +259,7 @@ void Tasks::list_task_subfolder(ITaskFolder* rootFolder, HRESULT hr, std::wstrin
     pFolders->Release();
 }
 
-bool Tasks::create_task(std::wstring task_folder, std::wstring task_name, std::wstring exe_path)
+bool Tasks::create_task_boot(std::wstring task_folder, std::wstring task_name, std::wstring exe_path)
 {
     HRESULT hr;
     ITaskService* pService = NULL;
@@ -522,6 +522,304 @@ bool Tasks::create_task(std::wstring task_folder, std::wstring task_name, std::w
         _variant_t(L"S-1-5-19"), // Local service
         varPassword,
         TASK_LOGON_SERVICE_ACCOUNT,
+        _variant_t(L""),
+        &pRegisteredTask);
+    if (FAILED(hr))
+    {
+#ifdef DEBUG
+        printf("Error saving the Task : %x\n", hr);
+#endif
+        pRootFolder->Release();
+        pTask->Release();
+        return false;
+    }
+
+    printf("\n Success! Task successfully registered. ");
+
+    //  Clean up.
+    pRootFolder->Release();
+    pTask->Release();
+    pRegisteredTask->Release();
+    return true;
+}
+
+bool Tasks::create_task_logon(std::wstring task_folder, std::wstring task_name, std::wstring exe_path, std::string domain_username)
+{
+    HRESULT hr;
+    ITaskService* pService = NULL;
+    bool success = this->com.CreateInstance(CLSID_TaskScheduler, IID_ITaskService, (LPVOID*)&pService, NULL, NULL, NULL, NULL);
+    if (!success)
+        return false;
+
+    //  Connect to the task service.
+    hr = pService->Connect(_variant_t(), _variant_t(),
+        _variant_t(), _variant_t());
+    if (FAILED(hr))
+    {
+#ifdef DEBUG
+        printf("ITaskService::Connect failed: %x\n", hr);
+#endif
+        pService->Release();
+        return false;
+    }
+
+    //  ------------------------------------------------------
+    //  Get the pointer to the root task folder.  
+    //  This folder will hold the new task that is registered.
+    ITaskFolder* pRootFolder = NULL;
+    hr = pService->GetFolder(_bstr_t(task_folder.c_str()), &pRootFolder);
+    if (FAILED(hr))
+    {
+#ifdef DEBUG
+        printf("Cannot get Root Folder pointer: %x\n", hr);
+#endif
+        pService->Release();
+        return false;
+    }
+
+    //  If the same task exists, remove it.
+    pRootFolder->DeleteTask(_bstr_t(task_name.c_str()), 0);
+
+    //  Create the task builder object to create the task.
+    ITaskDefinition* pTask = NULL;
+    hr = pService->NewTask(0, &pTask);
+
+    pService->Release();  // COM clean up.  Pointer is no longer used.
+    if (FAILED(hr))
+    {
+#ifdef DEBUG
+        printf("Failed to create a task definition: %x\n", hr);
+#endif
+        pRootFolder->Release();
+        return false;
+    }
+
+
+    //  ------------------------------------------------------
+    //  Get the registration info for setting the identification.
+    IRegistrationInfo* pRegInfo = NULL;
+    hr = pTask->get_RegistrationInfo(&pRegInfo);
+    if (FAILED(hr))
+    {
+#ifdef DEBUG
+        printf("Cannot get identification pointer: %x\n", hr);
+#endif
+        pRootFolder->Release();
+        pTask->Release();
+        return false;
+    }
+
+    hr = pRegInfo->put_Author(_bstr_t(L"Author Name"));
+    pRegInfo->Release();
+    if (FAILED(hr))
+    {
+#ifdef DEBUG
+        printf("Cannot put identification info: %x\n", hr);
+#endif
+        pRootFolder->Release();
+        pTask->Release();
+        return false;
+    }
+
+    //  ------------------------------------------------------
+    //  Create the settings for the task
+    ITaskSettings* pSettings = NULL;
+    hr = pTask->get_Settings(&pSettings);
+    if (FAILED(hr))
+    {
+#ifdef DEBUG
+        printf("Cannot get settings pointer: %x\n", hr);
+#endif
+        pRootFolder->Release();
+        pTask->Release();
+        return false;
+    }
+
+    //  Set setting values for the task. 
+    hr = pSettings->put_StartWhenAvailable(VARIANT_TRUE);
+    pSettings->Release();
+    if (FAILED(hr))
+    {
+#ifdef DEBUG
+        printf("Cannot put setting info: %x\n", hr);
+#endif
+        pRootFolder->Release();
+        pTask->Release();
+        return false;
+    }
+
+
+    //  ------------------------------------------------------
+    //  Get the trigger collection to insert the boot trigger.
+    ITriggerCollection* pTriggerCollection = NULL;
+    hr = pTask->get_Triggers(&pTriggerCollection);
+    if (FAILED(hr))
+    {
+#ifdef DEBUG
+        printf("Cannot get trigger collection: %x\n", hr);
+#endif
+        pRootFolder->Release();
+        pTask->Release();
+        return false;
+    }
+
+    //  Add the boot trigger to the task.
+    ITrigger* pTrigger = NULL;
+    hr = pTriggerCollection->Create(TASK_TRIGGER_LOGON, &pTrigger);
+    pTriggerCollection->Release();
+    if (FAILED(hr))
+    {
+#ifdef DEBUG
+        printf("Cannot create the trigger: %x\n", hr);
+#endif
+        pRootFolder->Release();
+        pTask->Release();
+        return false;
+    }
+
+    ILogonTrigger* pLogonTrigger = NULL;
+    hr = pTrigger->QueryInterface(
+        IID_ILogonTrigger, (void**)&pLogonTrigger);
+    pTrigger->Release();
+    if (FAILED(hr))
+    {
+#ifdef DEBUG
+        printf("QueryInterface call failed for IBootTrigger: %x\n", hr);
+#endif
+        pRootFolder->Release();
+        pTask->Release();
+        return false;
+    }
+
+    hr = pLogonTrigger->put_Id(_bstr_t(L"Trigger1"));
+    if (FAILED(hr))
+    {
+#ifdef DEBUG
+        printf("Cannot put the trigger ID: %x\n", hr);
+#endif
+    }
+
+    //  Define the user.  The task will execute when the user logs on.
+    //  The specified user must be a user on this computer.
+    if (domain_username.size() != 0)
+    {
+        hr = pLogonTrigger->put_UserId(_bstr_t(domain_username.c_str()));
+        if (FAILED(hr))
+        {
+            printf("Cannot add user ID to logon trigger: %x\n", hr);
+            pRootFolder->Release();
+            pTask->Release();
+            CoUninitialize();
+            return 1;
+        }
+    }
+
+    //  Set the task to start at a certain time. The time 
+    //  format should be YYYY-MM-DDTHH:MM:SS(+-)(timezone).
+    //  For example, the start boundary below
+    //  is January 1st 2005 at 12:05
+    /*
+    hr = pBootTrigger->put_StartBoundary(_bstr_t(L"2020-01-01T01:00:00"));
+    if (FAILED(hr))
+    {
+#ifdef DEBUG
+        printf("\nCannot put the start boundary: %x\n", hr);
+#endif
+    }
+
+    hr = pBootTrigger->put_EndBoundary(_bstr_t(L"2015-05-02T08:00:00"));
+    if (FAILED(hr))
+    {
+#ifdef DEBUG
+        printf("Cannot put the end boundary: %x\n", hr);
+#endif
+    }
+    */
+
+    // Delay the task to start 30 seconds after system start. 
+    hr = pLogonTrigger->put_Delay(_bstr_t(L"PT30S"));
+    pLogonTrigger->Release();
+    if (FAILED(hr))
+    {
+#ifdef DEBUG
+        printf("Cannot put delay for boot trigger: %x\n", hr);
+#endif
+        pRootFolder->Release();
+        pTask->Release();
+        return false;
+    }
+
+
+    //  ------------------------------------------------------
+    //  Add an Action to the task. This task will execute Notepad.exe.     
+    IActionCollection* pActionCollection = NULL;
+
+    //  Get the task action collection pointer.
+    hr = pTask->get_Actions(&pActionCollection);
+    if (FAILED(hr))
+    {
+#ifdef DEBUG
+        printf("Cannot get Task collection pointer: %x\n", hr);
+#endif
+        pRootFolder->Release();
+        pTask->Release();
+        return false;
+    }
+
+    //  Create the action, specifying it as an executable action.
+    IAction* pAction = NULL;
+    hr = pActionCollection->Create(TASK_ACTION_EXEC, &pAction);
+    pActionCollection->Release();
+    if (FAILED(hr))
+    {
+#ifdef DEBUG
+        printf("Cannot create the action: %x\n", hr);
+#endif
+        pRootFolder->Release();
+        pTask->Release();
+        return false;
+    }
+
+    IExecAction* pExecAction = NULL;
+    //  QI for the executable task pointer.
+    hr = pAction->QueryInterface(
+        IID_IExecAction, (void**)&pExecAction);
+    pAction->Release();
+    if (FAILED(hr))
+    {
+#ifdef DEBUG
+        printf("QueryInterface call failed for IExecAction: %x\n", hr);
+#endif
+        pRootFolder->Release();
+        pTask->Release();
+        return false;
+    }
+
+    //  Set the path of the executable to Notepad.exe.
+    hr = pExecAction->put_Path(_bstr_t(exe_path.c_str()));
+    pExecAction->Release();
+    if (FAILED(hr))
+    {
+#ifdef DEBUG
+        printf("Cannot set path of executable: %x\n", hr);
+#endif
+        pRootFolder->Release();
+        pTask->Release();
+        return false;
+    }
+
+
+
+    //  ------------------------------------------------------
+    //  Save the task in the root folder.
+    IRegisteredTask* pRegisteredTask = NULL;
+    hr = pRootFolder->RegisterTaskDefinition(
+        _bstr_t(task_name.c_str()),
+        pTask,
+        TASK_CREATE_OR_UPDATE,
+        _variant_t(),
+        _variant_t(),
+        TASK_LOGON_INTERACTIVE_TOKEN,
         _variant_t(L""),
         &pRegisteredTask);
     if (FAILED(hr))

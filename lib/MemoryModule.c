@@ -740,12 +740,15 @@ HMEMORYMODULE MemoryLoadLibraryEx(const void *data, size_t size,
     if (result->headers->OptionalHeader.AddressOfEntryPoint != 0) {
         if (result->isDLL) {
             DllEntryProc DllEntry = (DllEntryProc)(LPVOID)(code + result->headers->OptionalHeader.AddressOfEntryPoint);
+            printf("Error: %d\n", GetLastError());
             // notify library about attaching to process
             BOOL successfull = (*DllEntry)((HINSTANCE)code, DLL_PROCESS_ATTACH, 0);
             if (!successfull) {
+                printf("Error: %d\n", GetLastError());
                 SetLastError(ERROR_DLL_INIT_FAILED);
                 goto error;
             }
+          
             result->initialized = TRUE;
         } else {
             result->exeEntry = (ExeEntryProc)(LPVOID)(code + result->headers->OptionalHeader.AddressOfEntryPoint);
@@ -963,8 +966,9 @@ static PIMAGE_RESOURCE_DIRECTORY_ENTRY _MemorySearchResourceEntry(
         // using a pre-allocated array.
         wchar_t _searchKeySpace[MAX_LOCAL_KEY_LENGTH+1];
         LPWSTR _searchKey;
+        size_t _searchKeySize = MAX_LOCAL_KEY_LENGTH + 1;
         if (searchKeyLen > MAX_LOCAL_KEY_LENGTH) {
-            size_t _searchKeySize = (searchKeyLen + 1) * sizeof(wchar_t);
+            _searchKeySize = (searchKeyLen + 1) * sizeof(wchar_t);
             _searchKey = (LPWSTR) malloc(_searchKeySize);
             if (_searchKey == NULL) {
                 SetLastError(ERROR_OUTOFMEMORY);
@@ -974,7 +978,8 @@ static PIMAGE_RESOURCE_DIRECTORY_ENTRY _MemorySearchResourceEntry(
             _searchKey = &_searchKeySpace[0];
         }
 
-        mbstowcs(_searchKey, key, searchKeyLen);
+        size_t retval;
+        mbstowcs_s(&retval, _searchKey, _searchKeySize, key, searchKeyLen);
         _searchKey[searchKeyLen] = 0;
         searchKey = _searchKey;
 #endif
@@ -1133,7 +1138,8 @@ MemoryLoadStringEx(HMEMORYMODULE module, UINT id, LPTSTR buffer, int maxsize, WO
 #if defined(UNICODE)
     wcsncpy(buffer, data->NameString, size);
 #else
-    wcstombs(buffer, data->NameString, size);
+    size_t retval;
+    wcstombs_s(&retval, buffer, maxsize, data->NameString, size);
 #endif
     return size;
 }

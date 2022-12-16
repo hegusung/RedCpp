@@ -40,7 +40,8 @@ public:
 	~Tasks();
 	std::list<Task>* list_tasks();
 	void list_task_subfolder(ITaskFolder* rootFolder, HRESULT hr, std::wstring folder, std::list<Task>* task_list);
-	bool create_task(std::wstring task_folder, std::wstring task_name, std::wstring exe_path);
+	bool create_task_boot(std::wstring task_folder, std::wstring task_name, std::wstring exe_path);
+	bool create_task_logon(std::wstring task_folder, std::wstring task_name, std::wstring exe_path, std::string domain_username);
 	bool delete_task(std::wstring task_folder, std::wstring task_name);
 	bool start_task(std::wstring task_folder, std::wstring task_name);
 	bool stop_task(std::wstring task_folder, std::wstring task_name);

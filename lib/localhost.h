@@ -104,7 +104,7 @@ public:
 	std::list<std::string>* listSubKeys(const char* reg_path);
 	std::string getStringRegKey(HKEY hKey, const char* valueName);
 	// Screenshot
-	vectByte screenshot();
+	char* screenshot(int* size);
 };
 
 void image_to_buffer_png(const CImage &image, vectByte &buf);
