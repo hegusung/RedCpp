@@ -398,6 +398,42 @@ void memory_module()
 	}
 }
 
+void dll_analysis()
+{
+	Bypass_EDR byp = Bypass_EDR();
+
+	std::list<DLL> dll_list = byp.list_loaded_dlls();
+	for (std::list<DLL>::const_iterator iterator = dll_list.begin(), end = dll_list.end(); iterator != end; ++iterator) {
+
+		printf("%s is loaded at 0x%p.\n", (*iterator).name.c_str(), (*iterator).address);
+	}
+
+
+	HMODULE hDll = LoadLibrary("C:\\windows\\system32\\ntdll.dll");
+
+	std::list<std::string> hook_list = byp.check_hook_jmp(hDll);
+	printf("Hooks detection by JMP opcode:\n");
+	for (std::list<std::string>::const_iterator iterator = hook_list.begin(), end = hook_list.end(); iterator != end; ++iterator) {
+
+		printf("JMP : %s is hooked\n", (*iterator).c_str());
+	}
+
+	std::list<std::string>* hook_list2 = byp.check_hook_diff(L"C:\\windows\\system32\\ntdll.dll");
+	if (hook_list2 != NULL)
+	{
+		printf("Hooks detected by diff:\n");
+		for (std::list<std::string>::const_iterator iterator = hook_list2->begin(), end = hook_list2->end(); iterator != end; ++iterator) {
+
+			printf("DIFF: %s is hooked\n", (*iterator).c_str());
+		}
+	}
+	else
+	{
+		printf("Fail to get hooks\n");
+	}
+
+}
+
 int main()
 {
     std::cout << "Hello World!\n";
@@ -413,10 +449,11 @@ int main()
 	void* amsi_addr = byp.GetModuleFromPEB(L"amsi.dll");
 	printf("Amsi DLL: %x\n", amsi_addr);
 
+	dll_analysis();
+
 	//dump_lsass();
 
-
-	memory_module();
+	//memory_module();
 
 	printf("End DumpLSASS\n");
 }

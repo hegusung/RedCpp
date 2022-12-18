@@ -20,6 +20,9 @@
 #include <Windows.h>
 #include <psapi.h>
 #include <map>
+#include <list>
+#include <string>
+#include <tlhelp32.h>
 #include "MemoryModule.h"
 
 #if defined(METHOD_NTDLL)
@@ -100,6 +103,13 @@ typedef struct _LDR_DATA_TABLE_ENTRY
     LIST_ENTRY StaticLinks;
 } LDR_DATA_TABLE_ENTRY, * PLDR_DATA_TABLE_ENTRY;
 
+class DLL
+{
+public:
+    DLL(char* name, BYTE* address);
+    std::string name;
+    BYTE* address;
+};
 
 class Bypass_EDR
 {
@@ -130,6 +140,11 @@ public:
     bool load_dll(const char* dll_name, const char* dll_data, size_t dll_size);
     bool dll_exists(const char* dll_name);
     void* get_func(const char* dll_name, const char* func_name);
+
+    std::list<DLL> list_loaded_dlls();
+
+    std::list<std::string> check_hook_jmp(HMODULE hDll);
+    std::list<std::string>* check_hook_diff(const wchar_t* dll_path);
 private:
     std::map<std::string, HMEMORYMODULE> module_map;
 };

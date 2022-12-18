@@ -359,3 +359,227 @@ void* Bypass_EDR::get_func(const char* dll_name, const char* func_name)
 
 	return result;
 }
+
+DLL::DLL(char* name, BYTE* address)
+{
+	this->name = std::string(name);
+	this->address = address;
+}
+
+/*
+* Source: https://github.com/Mr-Un1k0d3r/EDRs/blob/main/hook_finder64.c
+*/
+std::list<DLL> Bypass_EDR::list_loaded_dlls()
+{
+	std::list<DLL> dll_list;
+
+	HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, 0);
+	MODULEENTRY32 me32;
+	me32.dwSize = sizeof(MODULEENTRY32);
+
+	if (Module32First(hSnap, &me32)) {
+		do {
+			dll_list.push_back(DLL(me32.szExePath, me32.modBaseAddr));
+
+		} while (Module32Next(hSnap, &me32));
+	}
+
+	CloseHandle(hSnap);
+
+	return dll_list;
+}
+
+/*
+* Source: https://github.com/Mr-Un1k0d3r/EDRs/blob/main/hook_finder64.c
+*/
+std::list<std::string> Bypass_EDR::check_hook_jmp(HMODULE hDll)
+{
+	
+	std::list<std::string> hook_list;
+	
+	IMAGE_DOS_HEADER* MZ = (IMAGE_DOS_HEADER*)hDll;
+	IMAGE_NT_HEADERS* PE = (IMAGE_NT_HEADERS*)((BYTE*)hDll + MZ->e_lfanew);
+	IMAGE_EXPORT_DIRECTORY* export_dir = (IMAGE_EXPORT_DIRECTORY*)((BYTE*)hDll + PE->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress);
+
+	DWORD* name = (DWORD*)((BYTE*)hDll + export_dir->AddressOfNames);
+
+	DWORD i = 0;
+	for (i; i < export_dir->NumberOfNames; i++)
+	{
+		int* opcode = (int*)GetProcAddress(hDll, (LPCSTR)((CHAR*)hDll + name[i]));
+
+		// not all EDRs hook the first byte you will miss some hook
+		if (*opcode == 0xe9) {
+			hook_list.push_back(std::string((CHAR*)hDll + name[i]));
+		}
+	}
+
+	return hook_list;
+}
+
+void PrintHexDump(DWORD length, PBYTE buffer)
+{
+	DWORD i, count, index;
+	CHAR rgbDigits[] = "0123456789abcdef";
+	CHAR rgbLine[100];
+	char cbLine;
+
+	for (index = 0; length; length -= count, buffer += count, index += count)
+	{
+		count = (length > 16) ? 16 : length;
+
+		sprintf_s(rgbLine, 100, "%4.4x  ", index);
+		cbLine = 6;
+
+		for (i = 0; i < count; i++)
+		{
+			rgbLine[cbLine++] = rgbDigits[buffer[i] >> 4];
+			rgbLine[cbLine++] = rgbDigits[buffer[i] & 0x0f];
+			if (i == 7)
+			{
+				rgbLine[cbLine++] = ':';
+			}
+			else
+			{
+				rgbLine[cbLine++] = ' ';
+			}
+		}
+		for (; i < 16; i++)
+		{
+			rgbLine[cbLine++] = ' ';
+			rgbLine[cbLine++] = ' ';
+			rgbLine[cbLine++] = ' ';
+		}
+
+		rgbLine[cbLine++] = ' ';
+
+		for (i = 0; i < count; i++)
+		{
+			if (buffer[i] < 32 || buffer[i] > 126)
+			{
+				rgbLine[cbLine++] = '.';
+			}
+			else
+			{
+				rgbLine[cbLine++] = buffer[i];
+			}
+		}
+
+		rgbLine[cbLine++] = 0;
+		printf("%s\n", rgbLine);
+	}
+}
+
+std::list<std::string>* Bypass_EDR::check_hook_diff(const wchar_t* dll_path)
+{
+	std::list<std::string>* hook_list = NULL;
+	int* ntdll_text = NULL;
+	int* memory_text = NULL;
+
+	// Download from disk the dll
+
+	HANDLE handle = this->CreateFileW((LPWSTR)dll_path, FILE_GENERIC_READ, FILE_SHARE_READ, FILE_OPEN, NULL);
+
+	if (handle == NULL)
+	{
+		return NULL;
+	}
+
+	unsigned int dll_size = 0;
+	unsigned int dll_buffer_size = 1024 * 10;
+	char* dll_buffer = (char*)malloc(dll_buffer_size);
+
+	DWORD size_read;
+	while (true)
+	{
+		NTSTATUS hres = this->ReadFile(handle, dll_buffer + dll_size, dll_buffer_size - dll_size, &size_read);
+
+		if (hres == 0xC0000011) // STATUS_END_OF_FILE
+		{
+			dll_size += size_read;
+			break;
+		}
+		else if (hres == 0) // STATUS_SUCCESS
+		{
+			dll_size += size_read;
+
+			if (dll_size == dll_buffer_size)
+			{
+				// REALLOC
+				dll_buffer_size += 1024 * 10;
+				dll_buffer = (char*)realloc(dll_buffer, dll_buffer_size);
+			}
+		}
+		else
+		{
+			return NULL;
+		}
+	}
+
+	BOOL res = this->CloseHandle(handle);
+	if (res == FALSE)
+	{
+		return NULL;
+	}
+
+	// Get the dll loaded, extract both 
+
+	HANDLE process = (HANDLE)-1;
+
+	MODULEINFO mi = {};
+	HMODULE ntdllModule = GetModuleHandleW(dll_path);
+
+	GetModuleInformation(process, ntdllModule, &mi, sizeof(mi));
+	LPVOID ntdllBase = (LPVOID)mi.lpBaseOfDll;
+
+	PIMAGE_DOS_HEADER hookedDosHeader = (PIMAGE_DOS_HEADER)ntdllBase;
+	PIMAGE_NT_HEADERS hookedNtHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)ntdllBase + hookedDosHeader->e_lfanew);
+
+	for (WORD i = 0; i < hookedNtHeader->FileHeader.NumberOfSections; i++) {
+		PIMAGE_SECTION_HEADER hookedSectionHeader = (PIMAGE_SECTION_HEADER)((DWORD_PTR)IMAGE_FIRST_SECTION(hookedNtHeader) + ((DWORD_PTR)IMAGE_SIZEOF_SECTION_HEADER * i));
+
+		if (!strcmp((char*)hookedSectionHeader->Name, (char*)".text")) {
+
+			ntdll_text = (int*)((DWORD_PTR)ntdllBase + (DWORD_PTR)hookedSectionHeader->VirtualAddress);
+			memory_text = (int*)((DWORD_PTR)dll_buffer + (DWORD_PTR)hookedSectionHeader->PointerToRawData);
+		}
+	}
+
+	if (ntdll_text == NULL || memory_text == NULL)
+	{
+		return NULL;
+	}
+
+	hook_list = new std::list<std::string>();
+
+	// Get function address in loaded dll
+
+	IMAGE_DOS_HEADER* MZ = (IMAGE_DOS_HEADER*)ntdllModule;
+	IMAGE_NT_HEADERS* PE = (IMAGE_NT_HEADERS*)((BYTE*)ntdllModule + MZ->e_lfanew);
+	IMAGE_EXPORT_DIRECTORY* export_dir = (IMAGE_EXPORT_DIRECTORY*)((BYTE*)ntdllModule + PE->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress);
+
+	DWORD* name = (DWORD*)((BYTE*)ntdllModule + export_dir->AddressOfNames);
+
+	DWORD i = 0;
+	for (i; i < export_dir->NumberOfNames; i++)
+	{
+		int* start_address = (int*)GetProcAddress(ntdllModule, (LPCSTR)((CHAR*)ntdllModule + name[i]));
+		int diff = (int)(start_address - ntdll_text);
+
+		// compary function start bytes
+		if (memcmp(start_address, memory_text+diff, 5) != 0) {
+			hook_list->push_back(std::string((CHAR*)ntdllModule + name[i]));
+
+			printf("%s DIFF:\n", (CHAR*)ntdllModule + name[i]);
+			printf("Expected:\n");
+			PrintHexDump(5, (PBYTE)(memory_text + diff));
+			printf("Got     :\n");
+			PrintHexDump(5, (PBYTE)start_address);
+		}
+	}
+
+	//CloseHandle(process);
+	FreeLibrary(ntdllModule);
+
+	return hook_list;
+}

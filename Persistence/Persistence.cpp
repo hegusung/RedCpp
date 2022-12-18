@@ -373,7 +373,7 @@ void set_wmi_persistence()
 	}
 	else
 	{
-		printf("Failed to list envent filters\n");
+		printf("Failed to list event filters\n");
 	}
 
 	printf("=========================================================\n");
