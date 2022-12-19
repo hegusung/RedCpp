@@ -8,7 +8,7 @@
 
 #include <windows.h>
 
-#define SW3_SEED 0x222B3B62
+#define SW3_SEED 0x2C84D5B8
 #define SW3_ROL8(v) (v << 8 | v >> 24)
 #define SW3_ROR8(v) (v >> 8 | v << 24)
 #define SW3_ROX8(v) ((SW3_SEED % 2) ? SW3_ROL8(v) : SW3_ROR8(v))
@@ -61,17 +61,7 @@ typedef struct _UNICODE_STRING
 	USHORT Length;
 	USHORT MaximumLength;
 	PWSTR  Buffer;
-} DUNICODE_STRING, *PDUNICODE_STRING;
-
-typedef struct _IO_STATUS_BLOCK
-{
-	union
-	{
-		NTSTATUS Status;
-		VOID*    Pointer;
-	};
-	ULONG_PTR Information;
-} IO_STATUS_BLOCK, *PIO_STATUS_BLOCK;
+} UNICODE_STRING, *PUNICODE_STRING;
 
 #ifndef InitializeObjectAttributes
 #define InitializeObjectAttributes( p, n, a, r, s ) { \
@@ -84,11 +74,21 @@ typedef struct _IO_STATUS_BLOCK
 }
 #endif
 
+typedef struct _IO_STATUS_BLOCK
+{
+	union
+	{
+		NTSTATUS Status;
+		VOID*    Pointer;
+	};
+	ULONG_PTR Information;
+} IO_STATUS_BLOCK, *PIO_STATUS_BLOCK;
+
 typedef struct _OBJECT_ATTRIBUTES
 {
 	ULONG           Length;
 	HANDLE          RootDirectory;
-	PDUNICODE_STRING ObjectName;
+	PUNICODE_STRING ObjectName;
 	ULONG           Attributes;
 	PVOID           SecurityDescriptor;
 	PVOID           SecurityQualityOfService;
@@ -125,5 +125,12 @@ EXTERN_C NTSTATUS NtCreateFile(
 	IN ULONG CreateOptions,
 	IN PVOID EaBuffer OPTIONAL,
 	IN ULONG EaLength);
+
+EXTERN_C NTSTATUS NtProtectVirtualMemory(
+	IN HANDLE ProcessHandle,
+	IN OUT PVOID * BaseAddress,
+	IN OUT PSIZE_T RegionSize,
+	IN ULONG NewProtect,
+	OUT PULONG OldProtect);
 
 #endif

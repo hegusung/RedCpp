@@ -216,7 +216,7 @@ void set_task_persistence()
 	Tasks tasks = Tasks();
 
 	//success = tasks.create_task_boot(L"\\", L"Test task", L"C:\\Windows\\System32\\calc.exe");
-	success = tasks.create_task_logon(L"\\", L"Test task", L"C:\\Windows\\System32\\calc.exe", "guillaume");
+	success = tasks.create_task_logon(L"\\", L"Test task", L"C:\\Windows\\System32\\calc.exe", "username");
 	if (success)
 	{
 		printf("Successfully created task\n");

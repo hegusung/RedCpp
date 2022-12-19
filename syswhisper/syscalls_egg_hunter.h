@@ -8,7 +8,7 @@
 
 #include <windows.h>
 
-#define SW3_SEED 0x1F637E43
+#define SW3_SEED 0xFC2A8914
 #define SW3_ROL8(v) (v << 8 | v >> 24)
 #define SW3_ROR8(v) (v >> 8 | v << 24)
 #define SW3_ROX8(v) ((SW3_SEED % 2) ? SW3_ROL8(v) : SW3_ROR8(v))
@@ -61,7 +61,7 @@ typedef struct _UNICODE_STRING
 	USHORT Length;
 	USHORT MaximumLength;
 	PWSTR  Buffer;
-} DUNICODE_STRING, *PDUNICODE_STRING;
+} UNICODE_STRING, *PUNICODE_STRING;
 
 #ifndef InitializeObjectAttributes
 #define InitializeObjectAttributes( p, n, a, r, s ) { \
@@ -88,7 +88,7 @@ typedef struct _OBJECT_ATTRIBUTES
 {
 	ULONG           Length;
 	HANDLE          RootDirectory;
-	PDUNICODE_STRING ObjectName;
+	PUNICODE_STRING ObjectName;
 	ULONG           Attributes;
 	PVOID           SecurityDescriptor;
 	PVOID           SecurityQualityOfService;
@@ -125,5 +125,12 @@ EXTERN_C NTSTATUS NtCreateFile(
 	IN ULONG CreateOptions,
 	IN PVOID EaBuffer OPTIONAL,
 	IN ULONG EaLength);
+
+EXTERN_C NTSTATUS NtProtectVirtualMemory(
+	IN HANDLE ProcessHandle,
+	IN OUT PVOID * BaseAddress,
+	IN OUT PSIZE_T RegionSize,
+	IN ULONG NewProtect,
+	OUT PULONG OldProtect);
 
 #endif

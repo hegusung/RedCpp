@@ -28,12 +28,16 @@
 #if defined(METHOD_NTDLL)
 #include "win_nt.h"
 #elif defined(METHOD_SYSCALL_EMBEDDED)
+// python3 syswhispers.py -a x64 -c msvc -f NtReadFile,NtClose,NtCreateFile,NtProtectVirtualMemory -m embedded -o syscalls_embedded
 #include "../syswhisper/syscalls_embedded.h"
 #elif defined(METHOD_SYSCALL_JUMPER)
+// python3 syswhispers.py -a x64 -c msvc -f NtReadFile,NtClose,NtCreateFile,NtProtectVirtualMemory -m jumper -o syscalls_jumper
 #include "../syswhisper/syscalls_jumper.h"
 #elif defined(METHOD_SYSCALL_JUMPER_RANDOMIZED)
+// python3 syswhispers.py -a x64 -c msvc -f NtReadFile,NtClose,NtCreateFile,NtProtectVirtualMemory -m jumper_randomized -o syscalls_jumper_randomized
 #include "../syswhisper/syscalls_jumper_randomized.h"
 #elif defined(METHOD_SYSCALL_EGG_HUNTER)
+// python3 syswhispers.py -a x64 -c msvc -f NtReadFile,NtClose,NtCreateFile,NtProtectVirtualMemory -m egg_hunter -o syscalls_egg_hunter
 #include "../syswhisper/syscalls_egg_hunter.h"
 #endif
 
