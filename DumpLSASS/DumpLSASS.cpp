@@ -297,7 +297,7 @@ void disable_edr()
 	}
 	else
 	{
-		printf("Enable to compare\n");
+		printf("Unable to compare\n");
 	}
 
 	res = byp.unhook_dll("ntdll.dll", ntdll_buffer);
@@ -308,6 +308,20 @@ void disable_edr()
 	}
 
 	printf("Successfully cleaned up ntdll\n");
+
+	compare = byp.check_dll("ntdll.dll", ntdll_buffer);
+	if (compare == 0)
+	{
+		printf("Ntdll has not been modified\n");
+	}
+	else if (compare == 1)
+	{
+		printf("Ntdll has been modified\n");
+	}
+	else
+	{
+		printf("Unable to compare\n");
+	}
 
 }
 
@@ -432,6 +446,7 @@ void dll_analysis()
 		printf("Fail to get hooks\n");
 	}
 
+
 }
 
 int main()
@@ -439,7 +454,7 @@ int main()
     std::cout << "Hello World!\n";
 
 	disable_edr();
-
+	
 	enable_privilege("SeDebugPrivilege");
 
 	printf("Disabling ETW\n");
@@ -448,6 +463,7 @@ int main()
 	
 	void* amsi_addr = byp.GetModuleFromPEB(L"amsi.dll");
 	printf("Amsi DLL: %x\n", amsi_addr);
+	
 
 	dll_analysis();
 

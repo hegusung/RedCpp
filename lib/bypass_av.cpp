@@ -228,7 +228,6 @@ int Bypass_EDR::check_dll(const char* dll_name, const char* ntdll_data)
 		PIMAGE_SECTION_HEADER hookedSectionHeader = (PIMAGE_SECTION_HEADER)((DWORD_PTR)IMAGE_FIRST_SECTION(hookedNtHeader) + ((DWORD_PTR)IMAGE_SIZEOF_SECTION_HEADER * i));
 
 		if (!strcmp((char*)hookedSectionHeader->Name, (char*)".text")) {
-
 			int res = memcmp((LPVOID)((DWORD_PTR)ntdllBase + (DWORD_PTR)hookedSectionHeader->VirtualAddress), (LPVOID)((DWORD_PTR)ntdll_data + (DWORD_PTR)hookedSectionHeader->PointerToRawData), hookedSectionHeader->Misc.VirtualSize);
 			if (res == 0)
 			{
@@ -473,8 +472,9 @@ void PrintHexDump(DWORD length, PBYTE buffer)
 std::list<std::string>* Bypass_EDR::check_hook_diff(const wchar_t* dll_path)
 {
 	std::list<std::string>* hook_list = NULL;
-	int* ntdll_text = NULL;
-	int* memory_text = NULL;
+	PBYTE dll_text = NULL;
+	PBYTE memory_text = NULL;
+	unsigned int text_size = 0;
 
 	// Download from disk the dll
 
@@ -530,22 +530,42 @@ std::list<std::string>* Bypass_EDR::check_hook_diff(const wchar_t* dll_path)
 	HMODULE ntdllModule = GetModuleHandleW(dll_path);
 
 	GetModuleInformation(process, ntdllModule, &mi, sizeof(mi));
-	LPVOID ntdllBase = (LPVOID)mi.lpBaseOfDll;
+	LPVOID dllBase = (LPVOID)mi.lpBaseOfDll;
 
-	PIMAGE_DOS_HEADER hookedDosHeader = (PIMAGE_DOS_HEADER)ntdllBase;
-	PIMAGE_NT_HEADERS hookedNtHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)ntdllBase + hookedDosHeader->e_lfanew);
+	PIMAGE_DOS_HEADER hookedDosHeader = (PIMAGE_DOS_HEADER)dllBase;
+	PIMAGE_NT_HEADERS hookedNtHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)dllBase + hookedDosHeader->e_lfanew);
 
 	for (WORD i = 0; i < hookedNtHeader->FileHeader.NumberOfSections; i++) {
 		PIMAGE_SECTION_HEADER hookedSectionHeader = (PIMAGE_SECTION_HEADER)((DWORD_PTR)IMAGE_FIRST_SECTION(hookedNtHeader) + ((DWORD_PTR)IMAGE_SIZEOF_SECTION_HEADER * i));
 
 		if (!strcmp((char*)hookedSectionHeader->Name, (char*)".text")) {
 
-			ntdll_text = (int*)((DWORD_PTR)ntdllBase + (DWORD_PTR)hookedSectionHeader->VirtualAddress);
-			memory_text = (int*)((DWORD_PTR)dll_buffer + (DWORD_PTR)hookedSectionHeader->PointerToRawData);
+			dll_text = (PBYTE)((DWORD_PTR)dllBase + (DWORD_PTR)hookedSectionHeader->VirtualAddress);
+			memory_text = (PBYTE)((DWORD_PTR)dll_buffer + (DWORD_PTR)hookedSectionHeader->PointerToRawData);
+			text_size = (unsigned int)hookedSectionHeader->Misc.VirtualSize;
+
+			printf("DLL start address: %x\n", dll_text);
+			printf("MEM start address: %x\n", memory_text);
+			printf("SIZE             : %x\n", text_size);
+
+			int compare = memcmp(dll_text, memory_text, text_size);
+			if (compare == 0)
+			{
+				printf("DLL has not been modified\n");
+			}
+			else if (compare == 1)
+			{
+				printf("DLL has been modified\n");
+			}
+			else
+			{
+				printf("Unable to compare\n");
+			}
+
 		}
 	}
 
-	if (ntdll_text == NULL || memory_text == NULL)
+	if (dll_text == NULL || memory_text == NULL)
 	{
 		return NULL;
 	}
@@ -561,25 +581,52 @@ std::list<std::string>* Bypass_EDR::check_hook_diff(const wchar_t* dll_path)
 	DWORD* name = (DWORD*)((BYTE*)ntdllModule + export_dir->AddressOfNames);
 
 	DWORD i = 0;
+	printf("DLL start address: %x\n", dll_text);
+	printf("MEM start address: %x\n", memory_text);
+	printf("SIZE             : %x\n", text_size);
+	printf("DLL end address  : %x\n", dll_text + text_size);
 	for (i; i < export_dir->NumberOfNames; i++)
 	{
-		int* start_address = (int*)GetProcAddress(ntdllModule, (LPCSTR)((CHAR*)ntdllModule + name[i]));
-		int diff = (int)(start_address - ntdll_text);
+		PBYTE start_address = (PBYTE)GetProcAddress(ntdllModule, (LPCSTR)((CHAR*)ntdllModule + name[i]));
+		DWORD diff = (DWORD)(start_address - dll_text);
 
-		// compary function start bytes
-		if (memcmp(start_address, memory_text+diff, 5) != 0) {
-			hook_list->push_back(std::string((CHAR*)ntdllModule + name[i]));
+		// check if address is in the .text section
+		if (diff >= 0 && diff < text_size)
+		{
+			// comparing function start bytes
+			if (memcmp(start_address, memory_text + diff, 5) != 0) {
+				hook_list->push_back(std::string((CHAR*)ntdllModule + name[i]));
 
-			printf("%s DIFF:\n", (CHAR*)ntdllModule + name[i]);
-			printf("Expected:\n");
-			PrintHexDump(5, (PBYTE)(memory_text + diff));
-			printf("Got     :\n");
-			PrintHexDump(5, (PBYTE)start_address);
+				printf("%s DIFF:\n", (CHAR*)ntdllModule + name[i]);
+				printf("Address: %x\n", start_address);
+				printf("Expected:\n");
+				PrintHexDump(5, (PBYTE)(memory_text + diff));
+				printf("Got     :\n");
+				PrintHexDump(5, (PBYTE)start_address);
+				printf("text size: %x\n", text_size);
+				printf("diff size: %x\n\n", diff);
+			}
 		}
+
 	}
 
 	//CloseHandle(process);
 	FreeLibrary(ntdllModule);
+
+
+	int compare = this->check_dll("ntdll.dll", dll_buffer);
+	if (compare == 0)
+	{
+		printf("Ntdll has not been modified\n");
+	}
+	else if (compare == 1)
+	{
+		printf("Ntdll has been modified\n");
+	}
+	else
+	{
+		printf("Unable to compare\n");
+	}
 
 	return hook_list;
 }
