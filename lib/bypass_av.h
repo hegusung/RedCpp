@@ -115,6 +115,16 @@ public:
     BYTE* address;
 };
 
+class Hook
+{
+public:
+    Hook(std::string name, BYTE* address, std::string expected, std::string got);
+    std::string name;
+    BYTE* address;
+    std::string expected;
+    std::string got;
+};
+
 class Bypass_EDR
 {
 public:
@@ -148,7 +158,7 @@ public:
     std::list<DLL> list_loaded_dlls();
 
     std::list<std::string> check_hook_jmp(HMODULE hDll);
-    std::list<std::string>* check_hook_diff(const wchar_t* dll_path);
+    std::list<Hook>* check_hook_diff(const wchar_t* dll_path, unsigned int dump_size);
 private:
     std::map<std::string, HMEMORYMODULE> module_map;
 };

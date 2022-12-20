@@ -432,14 +432,19 @@ void dll_analysis()
 		printf("JMP : %s is hooked\n", (*iterator).c_str());
 	}
 
-	std::list<std::string>* hook_list2 = byp.check_hook_diff(L"C:\\windows\\system32\\ntdll.dll");
+	std::list<Hook>* hook_list2 = byp.check_hook_diff(L"C:\\windows\\system32\\ntdll.dll", 20);
 	if (hook_list2 != NULL)
 	{
 		printf("Hooks detected by diff:\n");
-		for (std::list<std::string>::const_iterator iterator = hook_list2->begin(), end = hook_list2->end(); iterator != end; ++iterator) {
+		for (std::list<Hook>::const_iterator iterator = hook_list2->begin(), end = hook_list2->end(); iterator != end; ++iterator) {
 
-			printf("DIFF: %s is hooked\n", (*iterator).c_str());
+			printf("DIFF: %s is hooked\n", (*iterator).name.c_str());
+			printf("Address: 0x%x\n", (*iterator).address);
+			printf("Expected:\n%s\n", (*iterator).expected.c_str());
+			printf("Got     :\n%s\n", (*iterator).got.c_str());
 		}
+
+		delete hook_list2;
 	}
 	else
 	{
