@@ -5,8 +5,9 @@
 
 #include "services.h"
 
-Services::Services()
+Services::Services(const char* hostname)
 {
+    this->hostname = hostname;
 }
 
 Services::~Services()
@@ -21,7 +22,7 @@ std::list<Service>* Services::list_services()
     DWORD bufSize = 0;
     DWORD moreBytesNeeded, serviceCount;
 
-    SC_HANDLE sc = OpenSCManagerA(NULL, SERVICES_ACTIVE_DATABASE, SC_MANAGER_ENUMERATE_SERVICE);
+    SC_HANDLE sc = OpenSCManagerA(this->hostname, SERVICES_ACTIVE_DATABASE, SC_MANAGER_ENUMERATE_SERVICE);
     if (sc == NULL)
     {
 #ifdef DEBUG
@@ -110,7 +111,7 @@ std::list<Service>* Services::list_services()
 
 bool Services::create_service(const char* service_name, const char* display_name, const char* exe_path, DWORD start_mode)
 {
-    SC_HANDLE sc = OpenSCManagerA(NULL, SERVICES_ACTIVE_DATABASE, SC_MANAGER_CREATE_SERVICE);
+    SC_HANDLE sc = OpenSCManagerA(this->hostname, SERVICES_ACTIVE_DATABASE, SC_MANAGER_CREATE_SERVICE);
     if (sc == NULL)
     {
 #ifdef DEBUG
@@ -136,7 +137,7 @@ bool Services::create_service(const char* service_name, const char* display_name
 
 bool Services::start_service(const char* service_name)
 {
-    SC_HANDLE sc = OpenSCManagerA(NULL, SERVICES_ACTIVE_DATABASE, SC_MANAGER_ALL_ACCESS);
+    SC_HANDLE sc = OpenSCManagerA(this->hostname, SERVICES_ACTIVE_DATABASE, SC_MANAGER_ALL_ACCESS);
     if (sc == NULL)
     {
 #ifdef DEBUG
@@ -169,7 +170,7 @@ bool Services::start_service(const char* service_name)
 
 bool Services::stop_service(const char* service_name)
 {
-    SC_HANDLE sc = OpenSCManagerA(NULL, SERVICES_ACTIVE_DATABASE, SC_MANAGER_ALL_ACCESS);
+    SC_HANDLE sc = OpenSCManagerA(this->hostname, SERVICES_ACTIVE_DATABASE, SC_MANAGER_ALL_ACCESS);
     if (sc == NULL)
     {
 #ifdef DEBUG
@@ -203,7 +204,7 @@ bool Services::stop_service(const char* service_name)
 
 bool Services::delete_service(const char* service_name)
 {
-    SC_HANDLE sc = OpenSCManagerA(NULL, SERVICES_ACTIVE_DATABASE, SC_MANAGER_ALL_ACCESS);
+    SC_HANDLE sc = OpenSCManagerA(this->hostname, SERVICES_ACTIVE_DATABASE, SC_MANAGER_ALL_ACCESS);
     if (sc == NULL)
     {
 #ifdef DEBUG

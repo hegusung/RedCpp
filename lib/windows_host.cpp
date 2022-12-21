@@ -178,7 +178,9 @@ int WindowsHost::RCE_wmi(const char* command, const char* username, const char* 
 {
 	WMI wmi = WMI();
 
-	bool success = wmi.execute(this->ip.c_str(), username, password, command);
+	wmi.authenticate_cimv2(this->ip.c_str(), username, password);
+
+	bool success = wmi.execute(command);
 
 	if (success)
 	{

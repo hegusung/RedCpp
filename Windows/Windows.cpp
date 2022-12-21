@@ -6,6 +6,9 @@
 #include <iostream>
 #include "../lib/host.h"
 #include "../lib/windows_host.h"
+#include "../lib/services.h"
+#include "../lib/tasks.h"
+#include "../lib/winrm.h"
 
 void scan_server(const char* ip)
 {
@@ -70,6 +73,8 @@ void list_shares(const char* ip)
 
             wprintf(L" - %s %s (%s)\n", share.name.c_str(), share.local_path.c_str(), share.comment.c_str());
         }
+
+        delete shares;
     }
     else
     {
@@ -80,11 +85,13 @@ void list_shares(const char* ip)
 
 int main()
 {
-    const char* ip = "192.168.0.151";
+    bool success;
+    const char* ip = "192.168.0.150";
 
     WindowsHost host = WindowsHost(ip);
-    host.deauth("\\\\192.168.0.151");
+    //host.deauth("\\\\192.168.0.151");
 
+    /*
     scan_server(ip);
 
     list_shares(ip);
@@ -94,7 +101,12 @@ int main()
     list_shares(ip);
 
     host.deauth("\\\\192.168.0.151");
+    */
 
+    //host.auth("\\\\192.168.0.150", "main.local\\david", "Passw0rd!");
+    //list_shares(ip);
+
+    /*
     char* output = NULL;
     host.RCE_wmi_output(&output, "ipconfig", "domain.local\\user", "password", (size_t)(30 * 1000));
     if (output != NULL)
@@ -108,5 +120,81 @@ int main()
         printf("> %s\n", output);
 
     free(output);
+    */
+
+
+    printf("Trying different RCE\n");
+
+    int res = host.RCE_wmi("ipconfig", "main.local\\david", "Passw0rd!");
+    if (res == NULL)
+    {
+        printf("WMI command executed\n");
+    }
+    else
+    {
+        printf("WMI command failed: %d\n", res);
+    }
+
+    host.auth("\\\\192.168.0.150\\IPC$", "main.local\\david", "Passw0rd!");
+    Services srv = Services(ip);
+    success = srv.create_service("Test", "Test service", "C:\\test.exe", SERVICE_AUTO_START);
+    if (success)
+    {
+        printf("Successfully created remote service\n");
+    }
+    else
+    {
+        printf("Failed to create remote service: %d\n", GetLastError());
+    }
+
+    success = srv.delete_service("Test");
+    if (success)
+    {
+        printf("Successfully deleted remote service\n");
+    }
+    else
+    {
+        printf("Failed to delete remote service: %d\n", GetLastError());
+    }
+
+
+    Tasks tasks = Tasks(L"192.168.0.150", L"main.local", L"david", L"Passw0rd!");
+    success = tasks.create_task(L"\\", L"Test", L"C:\\test.exe");
+    if (success)
+    {
+        printf("Successfully created remote task\n");
+    }
+    else
+    {
+        printf("Failed to create remote task: %d\n", GetLastError());
+    }
+
+    success = tasks.delete_task(L"\\", L"Test");
+    if (success)
+    {
+        printf("Successfully deleted remote task\n");
+    }
+    else
+    {
+        printf("Failed to delete remote task: %d\n", GetLastError());
+    }
+
+    WinRM winrm = WinRM();
+    success = winrm.init(L"192.168.0.150", L"main.local\\david", L"Passw0rd!");
+    if (success)
+    {
+        printf("Successfully init\n");
+    }
+    else
+    {
+        printf("Successfully init: %d\n", GetLastError());
+    }
+
+    std::wstring result = winrm.execute(L"ipconfig");
+    wprintf(L"Executed command\n%s\n", result.c_str());
+
+    winrm.cleanup();
+
+    printf("Cleanup success\n");
 }
 

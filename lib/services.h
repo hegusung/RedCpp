@@ -28,13 +28,15 @@ public:
 class Services
 {
 public:
-	Services();
+	Services(const char* hostname=NULL);
 	~Services();
 	std::list<Service>* list_services();
 	bool create_service(const char* service_name, const char* display_name, const char* exe_path, DWORD start_mode);
 	bool start_service(const char* service_name);
 	bool stop_service(const char* service_name);
 	bool delete_service(const char* service_name);
+private:
+	const char* hostname;
 };
 
 #endif

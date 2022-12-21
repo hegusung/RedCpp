@@ -140,16 +140,24 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\lib\com.cpp" />
     <ClCompile Include="..\lib\host.cpp" />
     <ClCompile Include="..\lib\security.cpp" />
+    <ClCompile Include="..\lib\services.cpp" />
+    <ClCompile Include="..\lib\tasks.cpp" />
     <ClCompile Include="..\lib\windows_host.cpp" />
+    <ClCompile Include="..\lib\winrm.cpp" />
     <ClCompile Include="..\lib\wmi.cpp" />
     <ClCompile Include="Windows.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\lib\com.h" />
     <ClInclude Include="..\lib\host.h" />
     <ClInclude Include="..\lib\security.h" />
+    <ClInclude Include="..\lib\services.h" />
+    <ClInclude Include="..\lib\tasks.h" />
     <ClInclude Include="..\lib\windows_host.h" />
+    <ClInclude Include="..\lib\winrm.h" />
     <ClInclude Include="..\lib\wmi.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

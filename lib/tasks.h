@@ -36,10 +36,11 @@ public:
 class Tasks
 {
 public:
-	Tasks();
+	Tasks(const wchar_t* hostname=NULL, const wchar_t* domain = NULL, const wchar_t* username = NULL, const wchar_t* password = NULL);
 	~Tasks();
 	std::list<Task>* list_tasks();
 	void list_task_subfolder(ITaskFolder* rootFolder, HRESULT hr, std::wstring folder, std::list<Task>* task_list);
+	bool create_task(std::wstring task_folder, std::wstring task_name, std::wstring exe_path);
 	bool create_task_boot(std::wstring task_folder, std::wstring task_name, std::wstring exe_path);
 	bool create_task_logon(std::wstring task_folder, std::wstring task_name, std::wstring exe_path, std::string domain_username);
 	bool delete_task(std::wstring task_folder, std::wstring task_name);
@@ -53,6 +54,10 @@ public:
 	*/
 private:
 	COM com;
+	const wchar_t* w_hostname;
+	const wchar_t* w_username;
+	const wchar_t* w_domain;
+	const wchar_t* w_password;
 };
 
 #endif
